@@ -1,0 +1,6 @@
+import crypto from "node:crypto"; import OpenAI from "openai"; import { extractionSchema } from "./contracts";
+export type Transcript={workspaceId:string;source:'gmail'|'drive';body:string;attendees:string[];occurredAt:Date;url:string};
+export const fingerprint=(t:Transcript)=>crypto.createHash('sha256').update(`${t.attendees.sort().join('|')}|${t.occurredAt.toISOString()}|${t.body.trim()}`).digest('hex');
+export const isReadable=(body:string)=>body.trim().split(/\s+/).length>40;
+export const isInternalOnly=(attendees:string[],domain:string)=>attendees.length>0&&attendees.every(x=>x.toLowerCase().endsWith(`@${domain}`));
+export async function extractTranscript(transcript:Transcript){if(!process.env.OPENAI_API_KEY)throw new Error('OPENAI_API_KEY is required for live extraction');const client=new OpenAI({apiKey:process.env.OPENAI_API_KEY});const response=await client.responses.create({model:process.env.OPENAI_MODEL||'gpt-4.1-mini',input:[{role:'system',content:'Extract only facts directly supported by the transcript. Do not infer owner or dates. Return JSON matching the requested schema.'},{role:'user',content:transcript.body}],text:{format:{type:'json_object'}}});const text=response.output_text;return extractionSchema.parse(JSON.parse(text));}

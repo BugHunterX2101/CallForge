@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Gravity - Deal Tracker</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary": "#ffffff",
+                        "surface-container-high": "#e6e8ea",
+                        "tertiary-fixed": "#6ffbbe",
+                        "on-tertiary-container": "#009668",
+                        "inverse-surface": "#2d3133",
+                        "on-secondary-container": "#57657b",
+                        "surface-bright": "#f7f9fb",
+                        "secondary-fixed": "#d5e3fd",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#eff1f3",
+                        "warning-amber": "#F59E0B",
+                        "surface-tint": "#565e74",
+                        "surface-container-low": "#f2f4f6",
+                        "primary-fixed-dim": "#bec6e0",
+                        "secondary": "#515f74",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "on-tertiary-fixed": "#002113",
+                        "primary": "#000000",
+                        "on-primary-fixed": "#131b2e",
+                        "secondary-container": "#d5e3fd",
+                        "outline": "#76777d",
+                        "on-error-container": "#93000a",
+                        "surface-variant": "#e0e3e5",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a485c",
+                        "critical-red": "#EF4444",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface-dim": "#d8dadc",
+                        "tertiary-container": "#002113",
+                        "border-subtle": "#E2E8F0",
+                        "vibrant-success": "#10B981",
+                        "surface": "#f7f9fb",
+                        "on-surface-variant": "#45464d",
+                        "background": "#f7f9fb",
+                        "tertiary": "#000000",
+                        "outline-variant": "#c6c6cd",
+                        "primary-fixed": "#dae2fd",
+                        "on-error": "#ffffff",
+                        "surface-container": "#eceef0",
+                        "on-primary-container": "#7c839b",
+                        "inverse-primary": "#bec6e0",
+                        "on-secondary-fixed": "#0d1c2f",
+                        "error": "#ba1a1a",
+                        "on-background": "#191c1e",
+                        "on-surface": "#191c1e",
+                        "surface-container-highest": "#e0e3e5",
+                        "slate-gray": "#64748B",
+                        "secondary-fixed-dim": "#b9c7e0",
+                        "primary-container": "#131b2e",
+                        "deep-navy": "#0F172A"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin": "32px",
+                        "gutter": "24px",
+                        "base": "8px",
+                        "max-width": "1280px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "data-mono": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "data-mono": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md antialiased min-h-screen flex">
+<!-- Main Content Area -->
+<main class="flex-1 w-full min-w-0 flex flex-col h-screen overflow-hidden">
+<!-- Unified Top Header -->
+<header class="bg-surface dark:bg-inverse-surface border-b border-border-subtle dark:border-outline-variant flat no shadows w-full sticky top-0 z-50 flex justify-between items-center px-margin h-16 shrink-0">
+<div class="flex items-center gap-4">
+<img class="w-8 h-8 rounded-full object-cover hidden sm:block" data-alt="A minimalist, highly polished corporate logo mark for a product named 'Gravity'." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_bc4muVtJo6mNdOttiJ0Ytbd6JgoBP4NrWpyTvN2H__iffO_Qu8j1mZ4vLhqucB4MKuovYvXVpOBNxxTTbLbey5bM901-yGkRDq-yC8XScPxf16nNWlgmhm4nJb6Qo4Zxd2Arx7vad8SAq-v0qmQo-YNs1Oj3kY2XHQvOirZLsybQdv1e3tJ-JBRxggpYwXD8436nCp2u0j5TM2CYC_bg4iPmkoGeCpD3F_C77y7DjsDlrt_jUEvp"/>
+<h1 class="text-headline-md font-headline-md font-bold text-primary dark:text-primary-fixed">Gravity</h1>
+</div>
+<!-- Prominent Search & Filter -->
+<div class="hidden md:flex flex-1 max-w-2xl mx-8 relative">
+<div class="w-full flex items-center bg-surface-container-lowest border border-border-subtle rounded-full shadow-sm focus-within:border-deep-navy focus-within:ring-1 focus-within:ring-deep-navy transition-all h-10 overflow-hidden">
+<span class="material-symbols-outlined pl-4 text-outline text-[20px]">search</span>
+<input class="w-full bg-transparent border-none px-3 py-2 font-body-sm text-body-sm text-on-surface focus:ring-0 placeholder:text-outline outline-none" placeholder="Search deals, accounts..." type="text"/>
+<div class="h-6 w-px bg-border-subtle mx-1"></div>
+<button class="flex items-center gap-2 text-on-surface-variant font-label-caps text-label-caps hover:text-primary hover:bg-surface-container-low transition-colors uppercase whitespace-nowrap h-full px-4 border-l-0">
+<span class="material-symbols-outlined text-[18px]">filter_list</span>
+                        Filter
+                    </button>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="hidden sm:flex bg-deep-navy text-white hover:opacity-90 rounded-full px-4 py-2 items-center gap-2 font-label-caps text-label-caps transition-opacity whitespace-nowrap uppercase shadow-[0_4px_10px_rgba(15,23,42,0.1)]">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    New Deal
+                </button>
+<button class="text-on-surface-variant dark:text-outline-variant hover:bg-surface-container dark:hover:bg-surface-container-highest p-2 rounded-full transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<img class="w-8 h-8 rounded-full border border-border-subtle object-cover cursor-pointer active:opacity-80" data-alt="A professional headshot of a business user." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAL3VmI6kwIkeXfk6G5Kv9MVzYkudx_ODKiSeP_-BDOoKV7qGShW0hjOUw3queGS3Cc4nsXDei1_hOFw_Y_us6U2X-oUd7HYIdBb0veGX8yfN5RPnIzEebc87mqp2uuzQfO3-a0VUwzPPbf2VmCUrNjLKkSniOQdEyC9aIsPqfNoPTBRnFfQjes_fpJPGoftUh5Xx3UG7o2mtqQ-Tqdz_q28MuLrP21-UEzitEqoEVITEgi03719vR"/>
+</div>
+</header>
+<!-- Page Header -->
+<div class="px-margin py-6 shrink-0">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary m-0">Pipeline</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Manage active deals and stage progression.</p>
+</div>
+<!-- Kanban Board Container -->
+<div class="flex-1 overflow-x-auto overflow-y-hidden px-margin pb-margin">
+<div class="flex gap-6 h-full min-w-[1200px]">
+<!-- Column 1: Discovery -->
+<div class="w-[300px] flex flex-col flex-shrink-0 bg-surface-container-low rounded-xl border border-border-subtle overflow-hidden">
+<div class="px-4 py-3 border-b border-border-subtle bg-surface-container-lowest/50 flex justify-between items-center shrink-0">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-warning-amber"></span>
+<h3 class="font-label-caps text-label-caps text-on-surface uppercase">Discovery</h3>
+<span class="bg-surface-container-high px-2 py-0.5 rounded-full text-[10px] font-bold text-on-surface-variant">1</span>
+</div>
+<span class="font-data-mono text-data-mono text-outline">$120k</span>
+</div>
+<div class="flex-1 overflow-y-auto p-3 space-y-3">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer group relative">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center text-on-surface-variant font-label-caps text-[10px]">TF</div>
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate max-w-[160px]">TechFlow</span>
+</div>
+<button class="text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100 p-0.5 -mt-1 -mr-1">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<h4 class="font-body-sm text-body-sm text-primary font-semibold mb-3">Enterprise Expansion</h4>
+<div class="flex items-end justify-between mt-auto pt-3 border-t border-border-subtle/50">
+<div class="font-data-mono text-data-mono text-primary font-medium">$120,000</div>
+<div class="flex items-center gap-1.5 text-warning-amber bg-warning-amber/10 px-2 py-1 rounded-sm">
+<span class="material-symbols-outlined text-[14px]">schedule</span>
+<span class="font-body-sm text-[12px] font-medium leading-none">Today, 4 PM</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Column 2: Proposal -->
+<div class="w-[300px] flex flex-col flex-shrink-0 bg-surface-container-low rounded-xl border border-border-subtle overflow-hidden">
+<div class="px-4 py-3 border-b border-border-subtle bg-surface-container-lowest/50 flex justify-between items-center shrink-0">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<h3 class="font-label-caps text-label-caps text-on-surface uppercase">Proposal</h3>
+<span class="bg-surface-container-high px-2 py-0.5 rounded-full text-[10px] font-bold text-on-surface-variant">1</span>
+</div>
+<span class="font-data-mono text-data-mono text-outline">$45k</span>
+</div>
+<div class="flex-1 overflow-y-auto p-3 space-y-3">
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer group relative">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center text-on-surface-variant font-label-caps text-[10px]">AC</div>
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate max-w-[160px]">Acme Corp</span>
+</div>
+<button class="text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100 p-0.5 -mt-1 -mr-1">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<h4 class="font-body-sm text-body-sm text-primary font-semibold mb-3">Q3 Renewal</h4>
+<div class="flex items-end justify-between mt-auto pt-3 border-t border-border-subtle/50">
+<div class="font-data-mono text-data-mono text-primary font-medium">$45,000</div>
+<div class="flex items-center gap-1.5 text-vibrant-success bg-vibrant-success/10 px-2 py-1 rounded-sm">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span class="font-body-sm text-[12px] font-medium leading-none">Oct 24</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Column 3: Negotiation -->
+<div class="w-[300px] flex flex-col flex-shrink-0 bg-surface-container-low rounded-xl border border-border-subtle overflow-hidden">
+<div class="px-4 py-3 border-b border-border-subtle bg-surface-container-lowest/50 flex justify-between items-center shrink-0">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<h3 class="font-label-caps text-label-caps text-on-surface uppercase">Negotiation</h3>
+<span class="bg-surface-container-high px-2 py-0.5 rounded-full text-[10px] font-bold text-on-surface-variant">1</span>
+</div>
+<span class="font-data-mono text-data-mono text-outline">$250k</span>
+</div>
+<div class="flex-1 overflow-y-auto p-3 space-y-3">
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer group relative">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center text-on-surface-variant font-label-caps text-[10px]">SI</div>
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate max-w-[160px]">Stark Ind.</span>
+</div>
+<button class="text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100 p-0.5 -mt-1 -mr-1">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<h4 class="font-body-sm text-body-sm text-primary font-semibold mb-3">Stark Ind. Pilot</h4>
+<div class="flex items-end justify-between mt-auto pt-3 border-t border-border-subtle/50">
+<div class="font-data-mono text-data-mono text-primary font-medium">$250,000</div>
+<div class="flex items-center gap-1.5 text-on-surface-variant bg-surface-container-high px-2 py-1 rounded-sm">
+<span class="material-symbols-outlined text-[14px]">pending</span>
+<span class="font-body-sm text-[12px] font-medium leading-none">Pending</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Column 4: Closed Won -->
+<div class="w-[300px] flex flex-col flex-shrink-0 bg-surface-container-low rounded-xl border border-border-subtle overflow-hidden">
+<div class="px-4 py-3 border-b border-border-subtle bg-surface-container-lowest/50 flex justify-between items-center shrink-0">
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-vibrant-success"></span>
+<h3 class="font-label-caps text-label-caps text-on-surface uppercase">Closed Won</h3>
+<span class="bg-surface-container-high px-2 py-0.5 rounded-full text-[10px] font-bold text-on-surface-variant">1</span>
+</div>
+<span class="font-data-mono text-data-mono text-outline">$85.5k</span>
+</div>
+<div class="flex-1 overflow-y-auto p-3 space-y-3">
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest border border-border-subtle rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer group relative">
+<div class="flex justify-between items-start mb-2">
+<div class="flex items-center gap-2">
+<div class="w-6 h-6 rounded bg-surface-container-high flex items-center justify-center text-on-surface-variant font-label-caps text-[10px]">GN</div>
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate max-w-[160px]">GlobalNet</span>
+</div>
+<button class="text-outline hover:text-primary transition-colors opacity-0 group-hover:opacity-100 p-0.5 -mt-1 -mr-1">
+<span class="material-symbols-outlined text-[18px]">more_horiz</span>
+</button>
+</div>
+<h4 class="font-body-sm text-body-sm text-primary font-semibold mb-3">GlobalNet Integration</h4>
+<div class="flex items-end justify-between mt-auto pt-3 border-t border-border-subtle/50">
+<div class="font-data-mono text-data-mono text-primary font-medium">$85,500</div>
+<div class="flex items-center gap-1.5 text-vibrant-success bg-vibrant-success/10 px-2 py-1 rounded-sm">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span class="font-body-sm text-[12px] font-medium leading-none">Oct 20</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,15 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+enum DealStage { DISCOVERY PROPOSAL NEGOTIATION CLOSED_WON }
+enum DraftStatus { DRAFTED AWAITING_APPROVAL SENT REJECTED }
+enum ProcessedResult { LOGGED SKIPPED_INTERNAL FLAGGED_NO_MATCH FLAGGED_UNREADABLE }
+model User { id String @id @default(cuid()) email String @unique name String workspaceId String configs UserConfig[] deals Deal[] createdAt DateTime @default(now()) }
+model UserConfig { id String @id @default(cuid()) userId String @unique user User @relation(fields:[userId],references:[id]) transcriptProvider String @default("zoom") driveFolderId String? slackDestination String? crmType String? oauthConnections OAuthConnection[] }
+model OAuthConnection { id String @id @default(cuid()) configId String config UserConfig @relation(fields:[configId],references:[id]) provider String encryptedRefreshToken String status String @default("connected") expiresAt DateTime? @@unique([configId,provider]) }
+model Deal { id String @id @default(cuid()) workspaceId String ownerId String owner User @relation(fields:[ownerId],references:[id]) name String account String stage DealStage value Decimal? primaryContactId String? notes CallNote[] tasks Task[] }
+model Contact { id String @id @default(cuid()) workspaceId String email String name String account String role String? @@unique([workspaceId,email]) }
+model CallNote { id String @id @default(cuid()) workspaceId String dealId String deal Deal @relation(fields:[dealId],references:[id]) contactId String? callDate DateTime summary String objections Json commitments Json source String transcriptLink String draft FollowupDraft? tasks Task[] }
+model Task { id String @id @default(cuid()) workspaceId String dealId String? deal Deal? @relation(fields:[dealId],references:[id]) callNoteId String? callNote CallNote? @relation(fields:[callNoteId],references:[id]) description String ownerId String? dueDate DateTime? status String @default("open") }
+model FollowupDraft { id String @id @default(cuid()) callNoteId String @unique callNote CallNote @relation(fields:[callNoteId],references:[id]) to String subject String body String status DraftStatus @default(DRAFTED) gmailDraftId String? }
+model ProcessedCall { fingerprint String @id workspaceId String firstSeenSource String processedAt DateTime @default(now()) result ProcessedResult dealId String? followupStatus DraftStatus? }
+model ActivityEvent { id String @id @default(cuid()) workspaceId String type String payload Json createdAt DateTime @default(now()) }

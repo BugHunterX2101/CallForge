@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Call Notes - Gravity</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary": "#ffffff",
+                        "surface-container-high": "#e6e8ea",
+                        "tertiary-fixed": "#6ffbbe",
+                        "on-tertiary-container": "#009668",
+                        "inverse-surface": "#2d3133",
+                        "on-secondary-container": "#57657b",
+                        "surface-bright": "#f7f9fb",
+                        "secondary-fixed": "#d5e3fd",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#eff1f3",
+                        "warning-amber": "#F59E0B",
+                        "surface-tint": "#565e74",
+                        "surface-container-low": "#f2f4f6",
+                        "primary-fixed-dim": "#bec6e0",
+                        "secondary": "#515f74",
+                        "tertiary-fixed-dim": "#4edea3",
+                        "on-tertiary-fixed": "#002113",
+                        "primary": "#000000",
+                        "on-primary-fixed": "#131b2e",
+                        "secondary-container": "#d5e3fd",
+                        "outline": "#76777d",
+                        "on-error-container": "#93000a",
+                        "surface-variant": "#e0e3e5",
+                        "on-tertiary-fixed-variant": "#005236",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed-variant": "#3a485c",
+                        "critical-red": "#EF4444",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface-dim": "#d8dadc",
+                        "tertiary-container": "#002113",
+                        "border-subtle": "#E2E8F0",
+                        "vibrant-success": "#10B981",
+                        "surface": "#f7f9fb",
+                        "on-surface-variant": "#45464d",
+                        "background": "#f7f9fb",
+                        "tertiary": "#000000",
+                        "outline-variant": "#c6c6cd",
+                        "primary-fixed": "#dae2fd",
+                        "on-error": "#ffffff",
+                        "surface-container": "#eceef0",
+                        "on-primary-container": "#7c839b",
+                        "inverse-primary": "#bec6e0",
+                        "on-secondary-fixed": "#0d1c2f",
+                        "error": "#ba1a1a",
+                        "on-background": "#191c1e",
+                        "on-surface": "#191c1e",
+                        "surface-container-highest": "#e0e3e5",
+                        "slate-gray": "#64748B",
+                        "secondary-fixed-dim": "#b9c7e0",
+                        "primary-container": "#131b2e",
+                        "deep-navy": "#0F172A"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin": "32px",
+                        "gutter": "24px",
+                        "base": "8px",
+                        "max-width": "1280px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "data-mono": ["JetBrains Mono"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "data-mono": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-surface-container-low text-on-background font-body-md min-h-screen flex flex-col">
+<!-- Minimalist Header -->
+<header class="w-full sticky top-0 z-50 bg-surface-container-lowest dark:bg-inverse-surface border-b border-border-subtle dark:border-outline-variant flex justify-between items-center px-6 h-16 w-full shadow-sm">
+<div class="flex items-center gap-4">
+<a class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="arrow_back">arrow_back</span>
+<span class="font-label-caps text-label-caps">Back to Call Feed</span>
+</a>
+<div class="h-4 w-px bg-border-subtle hidden md:block"></div>
+<div class="hidden md:flex items-center gap-2">
+<img alt="Gravity Logo" class="w-6 h-6 rounded-full object-cover" data-alt="A minimalist, modern corporate logo icon for a software company named Gravity, utilizing deep navy and bright white colors in a clean vector style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_fcaitg9SwhvU-tqy-OEWI072pGaAxisL9fbc1ySup4dOWrWNK0GbPVBLXEXDQM45SRkBmtuQRtrMe0XvcGun_Nuwbv2cYVEQOwikW7XlZqkmSWHRLXCxqYFsW9dCCHL3imZacBQp04mcywWtqEzF7N0ZCO_ixdfjg16JIaMreJcvqgqvbJoliReZRWm8fVkag83d4nu0g5SAKHHj1QOQvfDGwk6p3Jb1-cG9SzNLJNpx9Ivwuc31"/>
+<span class="text-body-sm font-headline-md font-bold text-primary dark:text-primary-fixed">Gravity</span>
+</div>
+</div>
+<div class="flex items-center gap-4 text-primary dark:text-primary-fixed">
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-container dark:hover:bg-surface-container-highest transition-colors active:opacity-80 p-1 rounded-full" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-container dark:hover:bg-surface-container-highest transition-colors active:opacity-80 p-1 rounded-full" data-icon="help">help</span>
+<img alt="User profile" class="w-8 h-8 rounded-full object-cover border border-border-subtle cursor-pointer active:opacity-80" data-alt="A small, professional headshot avatar of a corporate user, well-lit, looking approachable against a clean, light neutral background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQhlKtpUgffd5RN4WwqzEKnW65GUat4R7dOZBw0Ti5nzHCFeGs1USDlfTxOW3tfAfqZn2ZPJYskjn0pqrChSwduljk4H13bAUPIEy6S_2vVvqNvSBldS-IWLbyMyaVdExyqkP8qez-OeT7m6nkvIC9EWcYhtG9hxK2ldIY27dVE0U4m_VEEP4w0Ve5o9NRRUWNS3DAtI2-TjHgGndUZbMhQplTWRJJh4RfG8IyPJTmO7IHgvbak8PQ"/>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 p-4 md:p-8 max-w-max-width mx-auto w-full grid grid-cols-1 xl:grid-cols-12 gap-8">
+<!-- Header Section -->
+<div class="xl:col-span-12 mb-2">
+<div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+<div>
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-primary mb-1">Acme Corp Initial Discovery</h2>
+<div class="flex items-center gap-3 text-on-surface-variant">
+<span class="font-data-mono text-data-mono flex items-center gap-1"><span class="material-symbols-outlined text-[16px]" data-icon="calendar_today">calendar_today</span> Oct 24, 2023 - 10:00 AM PST</span>
+<span class="font-data-mono text-data-mono flex items-center gap-1"><span class="material-symbols-outlined text-[16px]" data-icon="timer">timer</span> 45m 12s</span>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-vibrant-success/10 text-vibrant-success font-label-caps text-[10px]">
+<span class="material-symbols-outlined text-[12px]" data-icon="check_circle">check_circle</span> Processed
+                            </span>
+</div>
+</div>
+<button class="flex items-center justify-center gap-2 px-4 py-2 border border-border-subtle bg-surface-container-lowest text-secondary font-label-caps text-label-caps rounded-lg hover:bg-surface-container-low transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[16px]" data-icon="open_in_new">open_in_new</span>
+                        View Full Transcript
+                    </button>
+</div>
+</div>
+<!-- Left Column: Timeline / Document Insights -->
+<div class="xl:col-span-7 flex flex-col">
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl p-8 shadow-sm flex flex-col gap-10">
+<!-- Executive Summary -->
+<div class="relative">
+<div class="absolute left-[11px] top-8 bottom-[-40px] w-px bg-border-subtle hidden sm:block"></div>
+<div class="flex gap-4">
+<div class="mt-1 hidden sm:flex items-center justify-center w-6 h-6 rounded-full bg-surface-bright border border-border-subtle z-10 shrink-0">
+<span class="material-symbols-outlined text-slate-gray text-[14px]" data-icon="summarize">summarize</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline-md text-headline-md text-primary mb-3">Executive Summary</h3>
+<p class="font-body-md text-body-md text-on-surface leading-relaxed mb-6">
+                            The Acme Corp team (led by Sarah Jenkins, VP Ops) is primarily concerned with reducing manual data entry errors across their fulfillment centers. They are currently using a legacy system that causes a 12% error rate, translating to roughly $1.2M in annual shrinkage. They expressed strong interest in our automated reconciliation module, provided it can integrate seamlessly with their existing SAP backend.
+                        </p>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-4 border border-border-subtle rounded-lg bg-surface-bright">
+<p class="font-label-caps text-label-caps text-slate-gray mb-1">Budget</p>
+<p class="font-data-mono text-data-mono text-primary">$150k - $200k</p>
+</div>
+<div class="p-4 border border-border-subtle rounded-lg bg-surface-bright">
+<p class="font-label-caps text-label-caps text-slate-gray mb-1">Timeline</p>
+<p class="font-data-mono text-data-mono text-primary">Q1 2024</p>
+</div>
+<div class="p-4 border border-border-subtle rounded-lg bg-surface-bright">
+<p class="font-label-caps text-label-caps text-slate-gray mb-1">Decision Maker</p>
+<p class="font-data-mono text-data-mono text-primary">Sarah Jenkins</p>
+</div>
+<div class="p-4 border border-border-subtle rounded-lg bg-surface-bright">
+<p class="font-label-caps text-label-caps text-slate-gray mb-1">Competitors</p>
+<p class="font-data-mono text-data-mono text-primary">Logisync, Oracle</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Objections Raised -->
+<div class="relative mt-2">
+<div class="absolute left-[11px] top-8 bottom-[-40px] w-px bg-border-subtle hidden sm:block"></div>
+<div class="flex gap-4">
+<div class="mt-1 hidden sm:flex items-center justify-center w-6 h-6 rounded-full bg-warning-amber/10 border border-warning-amber/30 z-10 shrink-0">
+<span class="material-symbols-outlined text-warning-amber text-[14px]" data-icon="warning">warning</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline-md text-headline-md text-primary mb-3">Objections Raised</h3>
+<ul class="space-y-4">
+<li class="flex items-start gap-3 p-4 rounded-lg bg-warning-amber/5 border border-warning-amber/10">
+<span class="material-symbols-outlined text-warning-amber mt-0.5 text-[20px]" data-icon="error_outline">error_outline</span>
+<div>
+<p class="font-body-md text-body-md text-on-surface">Implementation time might disrupt peak season operations.</p>
+</div>
+</li>
+<li class="flex items-start gap-3 p-4 rounded-lg bg-warning-amber/5 border border-warning-amber/10">
+<span class="material-symbols-outlined text-warning-amber mt-0.5 text-[20px]" data-icon="error_outline">error_outline</span>
+<div>
+<p class="font-body-md text-body-md text-on-surface">Concerned about data residency requirements for their EU warehouses.</p>
+</div>
+</li>
+<li class="flex items-start gap-3 p-4 rounded-lg bg-warning-amber/5 border border-warning-amber/10">
+<span class="material-symbols-outlined text-warning-amber mt-0.5 text-[20px]" data-icon="error_outline">error_outline</span>
+<div>
+<p class="font-body-md text-body-md text-on-surface">Pushback on per-user pricing model vs flat site license.</p>
+</div>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Commitments Made -->
+<div class="relative mt-2">
+<div class="flex gap-4">
+<div class="mt-1 hidden sm:flex items-center justify-center w-6 h-6 rounded-full bg-vibrant-success/10 border border-vibrant-success/30 z-10 shrink-0">
+<span class="material-symbols-outlined text-vibrant-success text-[14px]" data-icon="task_alt">task_alt</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline-md text-headline-md text-primary mb-3">Commitments Made</h3>
+<ul class="space-y-4">
+<li class="flex items-start gap-3 p-4 rounded-lg bg-vibrant-success/5 border border-vibrant-success/10">
+<span class="material-symbols-outlined text-vibrant-success mt-0.5 text-[20px]" data-icon="check_circle">check_circle</span>
+<div>
+<p class="font-body-md text-body-md text-on-surface">Provide SAP integration technical documentation by Friday.</p>
+</div>
+</li>
+<li class="flex items-start gap-3 p-4 rounded-lg bg-vibrant-success/5 border border-vibrant-success/10">
+<span class="material-symbols-outlined text-vibrant-success mt-0.5 text-[20px]" data-icon="check_circle">check_circle</span>
+<div>
+<p class="font-body-md text-body-md text-on-surface">Schedule a deep-dive demo with their lead architect next week.</p>
+</div>
+</li>
+<li class="flex items-start gap-3 p-4 rounded-lg bg-vibrant-success/5 border border-vibrant-success/10">
+<span class="material-symbols-outlined text-vibrant-success mt-0.5 text-[20px]" data-icon="check_circle">check_circle</span>
+<div>
+<p class="font-body-md text-body-md text-on-surface">Send over a customized ROI calculator based on their $1.2M shrinkage figure.</p>
+</div>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Follow-up Workspace -->
+<div class="xl:col-span-5 flex flex-col h-full">
+<div class="bg-surface-container-lowest border border-border-subtle rounded-xl flex flex-col h-full overflow-hidden shadow-md">
+<!-- Workspace Header -->
+<div class="px-6 py-5 border-b border-border-subtle bg-surface-bright flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="p-2 bg-secondary-container rounded-lg text-on-secondary-container">
+<span class="material-symbols-outlined text-[20px]" data-icon="mail">mail</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-primary">Follow-up Workspace</h3>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-surface-container text-slate-gray font-label-caps text-[10px]">
+<span class="material-symbols-outlined text-[12px]" data-icon="auto_awesome">auto_awesome</span> Drafted
+                        </span>
+</div>
+<!-- Email Body (Editable Area representation) -->
+<div class="p-6 flex-1 overflow-y-auto">
+<div class="mb-5 bg-surface rounded-lg p-4 border border-border-subtle">
+<div class="flex items-start gap-4 mb-3 pb-3 border-b border-border-subtle">
+<label class="font-label-caps text-label-caps text-slate-gray w-16 pt-0.5">To:</label>
+<div class="font-body-sm text-body-sm text-primary flex-1">sarah.j@acmecorp.com</div>
+</div>
+<div class="flex items-start gap-4">
+<label class="font-label-caps text-label-caps text-slate-gray w-16 pt-0.5">Subject:</label>
+<div class="font-body-sm text-body-sm text-primary font-semibold flex-1">Following up: Gravity + Acme Corp Ops Efficiency</div>
+</div>
+</div>
+<div class="p-4 bg-surface-bright border border-border-subtle rounded-lg min-h-[300px]">
+<p class="font-body-md text-body-md text-on-surface whitespace-pre-wrap leading-relaxed outline-none" contenteditable="true">Hi Sarah,
+
+Great speaking with you and the team today. It’s clear that reducing the 12% manual data entry error rate in your fulfillment centers is a top priority for Q1.
+
+As promised, I’ve attached our technical documentation regarding the SAP integration to address your team's architecture questions. We are confident we can deploy without disrupting your peak season operations.
+
+I will follow up shortly with a customized ROI calculator based on the $1.2M shrinkage figure we discussed. 
+
+Are you and your lead architect available next Tuesday at 10 AM PST for a technical deep dive?
+
+Best,
+[Your Name]</p>
+</div>
+</div>
+<!-- Actions -->
+<div class="p-6 border-t border-border-subtle bg-surface-bright flex gap-4">
+<button class="flex-1 px-4 py-2.5 border border-border-subtle text-primary font-label-caps text-label-caps rounded-lg hover:bg-surface-container-low transition-colors bg-surface-container-lowest">
+                            Edit Prompt
+                        </button>
+<button class="flex-1 px-4 py-2.5 bg-vibrant-success text-on-primary font-label-caps text-label-caps rounded-lg hover:bg-opacity-90 transition-colors shadow-sm shadow-deep-navy/10 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]" data-icon="send">send</span>
+                            Approve &amp; Send
+                        </button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

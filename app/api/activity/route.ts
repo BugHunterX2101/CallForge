@@ -1,0 +1,1 @@
+import { NextResponse } from "next/server"; import { calls, drafts, integrations, tasks } from "@/lib/demo-data"; export async function GET(){return NextResponse.json({calls,drafts,integrations,tasks,mode:'demo'})}

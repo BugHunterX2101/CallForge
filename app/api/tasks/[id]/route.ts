@@ -1,0 +1,1 @@
+import { NextResponse } from "next/server"; export async function PATCH(request:Request,{params}:{params:Promise<{id:string}>}){return NextResponse.json({id:(await params).id,...await request.json()})}
