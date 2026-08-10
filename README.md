@@ -394,6 +394,8 @@ erDiagram
 │   ├── contacts/page.tsx           # Contacts
 │   ├── settings/page.tsx           # Settings & integrations
 │   ├── calls/[callId]/page.tsx     # Call Detail + Follow-up Workspace
+│   ├── not-found.tsx               # Branded 404 page
+│   ├── icon.svg                    # Favicon (brand mark)
 │   ├── api/
 │   │   ├── state/route.ts          # GET full live snapshot
 │   │   ├── events/route.ts         # SSE real-time stream
