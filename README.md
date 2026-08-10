@@ -38,27 +38,13 @@ The dashboard is a **fully interactive, real-time workspace**: every screen read
 
 | | |
 |---|---|
-| ⚡ **Real-time everything** | A shared live store (`lib/store.ts`) feeds every screen. Approve a draft, drag a deal, complete a task — the change persists through the API and pushes to all open tabs via SSE. |
-| 🔁 **End-to-end pipeline demo** | *Simulate incoming call* runs the real ingestion pipeline — fingerprint dedup, readability check, optional OpenAI extraction — and creates a call, follow-up draft, and tasks that appear everywhere instantly. |
-| ✅ **Human-gated follow-ups** | Drafts are grounded in the transcript and require explicit approval. Reject preserves the Gmail copy for editing. Approve is idempotent — no double-sends. |
-| 🗂️ **Pipeline as a visual** | Deals are a drag-and-drop kanban with live stage/value sums, search, filters, and one-click deal creation. |
-| 🧠 **Guardrail-first AI** | Extraction only records facts supported by the transcript. Stages move only on explicit signals; unstated due dates are "unspecified", never invented. |
-| 📱 **Responsive UI** | Desktop nav, mobile hamburger menu, and breakpoint-tuned layouts on every page. |
-| 🔒 **Secrets-safe by default** | `.env` is gitignored, `.env.example` holds placeholders only, and no credential ever ships in source control. |
-
----
-
-## Screens
-
-The dashboard implements the design system prototyped in [`stitch_dynamic_interface_studio/`](./stitch_dynamic_interface_studio/):
-
-| Activity Feed | Call Review |
-|---|---|
-| ![Activity feed](stitch_dynamic_interface_studio/activity_feed_reimagined/screen.png) | ![Call review](stitch_dynamic_interface_studio/call_review_reimagined/screen.png) |
-
-| Deal Pipeline | Daily Focus (Tasks) |
-|---|---|
-| ![Deal pipeline](stitch_dynamic_interface_studio/deal_pipeline_reimagined/screen.png) | ![Tasks](stitch_dynamic_interface_studio/tasks_reimagined/screen.png) |
+| **Real-time everything** | A shared live store (`lib/store.ts`) feeds every screen. Approve a draft, drag a deal, complete a task — the change persists through the API and pushes to all open tabs via SSE. |
+| **End-to-end pipeline demo** | *Simulate incoming call* runs the real ingestion pipeline — fingerprint dedup, readability check, optional OpenAI extraction — and creates a call, follow-up draft, and tasks that appear everywhere instantly. |
+| **Human-gated follow-ups** | Drafts are grounded in the transcript and require explicit approval. Reject preserves the Gmail copy for editing. Approve is idempotent — no double-sends. |
+| **Pipeline as a visual** | Deals are a drag-and-drop kanban with live stage/value sums, search, filters, and one-click deal creation. |
+| **Guardrail-first AI** | Extraction only records facts supported by the transcript. Stages move only on explicit signals; unstated due dates are "unspecified", never invented. |
+| **Responsive UI** | Desktop nav, mobile hamburger menu, and breakpoint-tuned layouts on every page. |
+| **Secrets-safe by default** | `.env` is gitignored, `.env.example` holds placeholders only, and no credential ever ships in source control. |
 
 ---
 
