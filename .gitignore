@@ -3,6 +3,7 @@ node_modules/
 .next/
 out/
 coverage/
+*.tsbuildinfo
 
 # Secrets and local environment
 .env
@@ -13,6 +14,9 @@ coverage/
 
 # Tooling / OS
 .vercel/
+.freebuff/
 .DS_Store
 Thumbs.db
 *.log
+
+.vercel

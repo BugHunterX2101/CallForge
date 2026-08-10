@@ -4,12 +4,12 @@ This guide creates the **application credentials** Gravity needs to let each use
 
 ## Before you begin
 
-Choose your production domain first. In the steps below, replace:
+Use these fixed application URLs when registering OAuth credentials:
 
 | Environment | Base URL |
 | --- | --- |
 | Local development | `http://localhost:3000` |
-| Vercel production | `https://YOUR-APP.vercel.app` |
+| Vercel production (stable alias) | `https://gravity-callforge.vercel.app` |
 
 Register these exact callback URLs in each provider, once Gravity's OAuth callback handlers have been deployed:
 
@@ -17,12 +17,19 @@ Register these exact callback URLs in each provider, once Gravity's OAuth callba
 http://localhost:3000/api/oauth/google/callback
 http://localhost:3000/api/oauth/slack/callback
 http://localhost:3000/api/oauth/hubspot/callback
-https://YOUR-APP.vercel.app/api/oauth/google/callback
-https://YOUR-APP.vercel.app/api/oauth/slack/callback
-https://YOUR-APP.vercel.app/api/oauth/hubspot/callback
+https://gravity-callforge.vercel.app/api/oauth/google/callback
+https://gravity-callforge.vercel.app/api/oauth/slack/callback
+https://gravity-callforge.vercel.app/api/oauth/hubspot/callback
 ```
 
-Do not use placeholder callback URLs in production. OAuth providers require an exact match.
+For Google, also register these **Authorized JavaScript origins**:
+
+```text
+http://localhost:3000
+https://gravity-callforge.vercel.app
+```
+
+Do not use the generated deployment URL (`gravity-callforge-jy0tgwpen-…vercel.app`) in provider settings: it can change on a redeploy. OAuth providers require an exact match, so use the stable alias above.
 
 ## 1. Gmail, Google Drive, and Google Sheets
 
@@ -51,7 +58,7 @@ https://www.googleapis.com/auth/spreadsheets
 `gmail.readonly` and `drive.readonly` are restricted scopes. Production public use can require Google verification and, depending on how data is stored or transmitted, a security assessment. Do not request broader Gmail or Drive access unless the implementation genuinely needs it.
 
 6. Open **Google Auth platform → Clients → Create Client**.
-7. Choose **Web application**. Add the local and production origins, then the Google callback URLs from the table above.
+7. Choose **Web application**. Add both Authorized JavaScript origins and both Google callback URLs shown above.
 8. Click **Create**, copy the **Client ID** and **Client secret**, and add them to local `.env` and Vercel environment variables:
 
 ```dotenv
