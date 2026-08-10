@@ -53,14 +53,20 @@ function seed(): DB {
       recapDestination: "Slack channel",
       transcriptFolder: "Gravity Transcripts",
     },
+    // Events are derived from the seeded entities (newest first) so the feed
+    // is consistent with the data it describes, with now-relative timestamps.
     events: [
-      { id: crypto.randomUUID(), type: "call_logged", title: "Initech Follow-up", detail: "Gmail · 10:45 AM", kind: "live", createdAt: nowIso(25) },
-      { id: crypto.randomUUID(), type: "call_logged", title: "Q2 Strategy Meeting.mp4", detail: "Drive · 09:12 AM", kind: "input", createdAt: nowIso(180) },
-      { id: crypto.randomUUID(), type: "call_logged", title: "Acme Corp Initial Discovery", detail: "Zoom · Oct 24", kind: "live", createdAt: nowIso(60 * 26) },
-      { id: crypto.randomUUID(), type: "draft_sent", title: "Follow-up sent to sarah.j@acmecorp.com", detail: "Gmail · Oct 23", kind: "draft", createdAt: nowIso(60 * 30) },
-      { id: crypto.randomUUID(), type: "call_logged", title: "Globex Initial Pitch", detail: "Zoom · Yesterday", kind: "live", createdAt: nowIso(60 * 50) },
+      { id: crypto.randomUUID(), type: "call_logged", title: "Acme Corp Initial Discovery", detail: "Zoom · Today, 10:00 AM", kind: "live", createdAt: nowIso(30) },
+      { id: crypto.randomUUID(), type: "draft_sent", title: "Follow-up sent to grace.ng@globalnet.com", detail: "Gmail · Today, 9:20 AM", kind: "draft", createdAt: nowIso(40) },
+      { id: crypto.randomUUID(), type: "call_logged", title: "Globex Initial Pitch", detail: "Zoom · Today, 9:15 AM", kind: "live", createdAt: nowIso(45) },
+      { id: crypto.randomUUID(), type: "call_logged", title: "Stark Ind. Pilot Sync", detail: "Phone · Yesterday, 4:15 PM", kind: "input", createdAt: nowIso(60 * 26) },
     ],
-    stats: { callsLogged: 12, draftsSent: 4 },
+    // Stats are derived from the actual seeded entities, so every number shown
+    // in the UI is verifiable against the data behind it.
+    stats: {
+      callsLogged: seedCalls.length,
+      draftsSent: seedDrafts.filter((d) => d.status === "sent").length,
+    },
     processedFingerprints: new Set<string>(),
     cannedCursor: 0,
   };

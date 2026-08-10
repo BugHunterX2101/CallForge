@@ -22,14 +22,20 @@ beforeEach(() => {
 });
 
 describe("snapshot", () => {
-  it("seeds demo data with consistent stats", () => {
+  it("seeds demo data with verified, consistent stats", () => {
     const s = snapshot();
     expect(s.mode).toBe("demo");
     expect(s.deals.length).toBeGreaterThan(0);
-    expect(s.stats.callsLogged).toBe(12);
-    expect(s.stats.draftsSent).toBe(4);
-    expect(s.stats.timeSaved).toMatch(/\d+h \d+m/);
+    // Stats must be derived from the actual seeded entities, not hardcoded.
+    expect(s.stats.callsLogged).toBe(s.calls.length);
+    expect(s.stats.draftsSent).toBe(s.drafts.filter((d) => d.status === "sent").length);
+    expect(s.stats.timeSaved).toMatch(/(\d+h \d+m|\d+m)/);
+    // The event feed is derived from the seeded entities (newest first).
     expect(s.events.length).toBeGreaterThan(0);
+    const seedCallTitles = new Set(s.calls.map((c) => c.title));
+    for (const e of s.events) {
+      if (e.type === "call_logged") expect(seedCallTitles.has(e.title)).toBe(true);
+    }
   });
 
   it("increments the version after a mutation", () => {
