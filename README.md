@@ -1,47 +1,83 @@
+<div align="center">
+
 # CallForge — Gravity Sales Call Workspace
 
-Gravity is a sales-call intelligence workspace: it watches the places a call transcript lands (email and Drive), extracts what was actually said into a deal update, dated tasks, and a follow-up draft, and puts every next step one tap from sending. The frontend is a live, real-time dashboard — Activity Feed, Pipeline, Call Notes, Tasks, Contacts, and Settings — backed by a REST API with SSE push updates, so everything displayed is wired end-to-end.
+**The silent sales partner.** Watch a call transcript land, and minutes later the CRM is updated, every objection and commitment is captured verbatim, tasks are owned and dated, and a grounded follow-up draft sits one tap from sending.
 
-The repository also contains the CallForge HubSpot marketplace app scaffolding (`hubspot-app/`) and the design references (`stitch_dynamic_interface_studio/`).
+![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-strict-3178c6?logo=typescript&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-Extraction-10a37f?logo=openai&logoColor=white)
+![Realtime](https://img.shields.io/badge/Realtime-SSE-10b981)
+![Tests](https://img.shields.io/badge/Tests-Vitest-729B1B?logo=vitest&logoColor=white)
 
----
+*Fully interactive demo workspace · no external credentials required · every screen wired end-to-end · real-time across open tabs*
 
-## Table of contents
-
-- [Features](#features)
-- [Architecture](#architecture)
-- [Agent processing pipeline](#agent-processing-pipeline)
-- [Core workflow](#core-workflow)
-- [Call & approval lifecycle](#call--approval-lifecycle)
-- [Data model](#data-model)
-- [Repository structure](#repository-structure)
-- [Technology stack](#technology-stack)
-- [Getting started](#getting-started)
-- [Live demo workspace](#live-demo-workspace)
-- [API surface](#api-surface)
-- [Environment variables](#environment-variables)
-- [Testing](#testing)
-- [Production notes & security](#production-notes--security)
-- [Related documents](#related-documents)
+</div>
 
 ---
 
-## Features
+## Why Gravity
 
-- **Live, real-time dashboard** — every screen reads from a shared server-side store (`lib/store.ts`) and updates instantly across open tabs via SSE (`/api/events`), with optimistic client updates.
-- **Activity Feed** — live stats (calls logged, drafts sent, time saved), pending follow-up approvals (approve/reject), input-needed resolution, and a real-time event feed.
-- **Simulated pipeline sweep** — the *Simulate incoming call* button runs the actual ingestion pipeline (fingerprint dedup → readability check → optional OpenAI extraction → call/draft/task writes) and pushes the result to every open tab.
-- **Pipeline** — drag deals between stages, create deals, search and filter; column values recalculate live.
-- **Tasks** — add, complete, and delete tasks with server-synced optimistic updates.
-- **Call Detail + Follow-up Workspace** — edit a draft and save, approve & send, reject, expand the transcript, resolve missing input, with proper not-found handling.
-- **Settings & Contacts** — live integration toggles, workspace configuration, and a contact list.
-- **Responsive UI** — desktop nav, mobile hamburger menu, and breakpoint-tuned layouts on every page.
+Sales reps don't lose deals to competitors as often as they lose them to their own admin backlog. The CRM doesn't get updated, the details of a call live only in memory, and the follow-up goes out — if it goes out — after the client has moved on.
+
+Gravity removes that tax by watching the two places a call transcript already lands — the transcript email and the Drive export — and turning whichever arrives first into:
+
+- **A logged deal update** with every objection and commitment recorded verbatim, never softened
+- **Owned, dated tasks** — or an explicit "unspecified" when the call never stated a date
+- **A grounded follow-up draft** written from the specific things that were said, not a template
+
+Everything internal happens without a click. The one thing that reaches the client — the follow-up email — waits for a single tap. No code path sends without an explicit approval.
+
+The dashboard is a **fully interactive, real-time workspace**: every screen reads from a shared server-side store, every action flows through the API, and updates push to every open tab instantly over Server-Sent Events.
+
+---
+
+## Key features
+
+| | |
+|---|---|
+| ⚡ **Real-time everything** | A shared live store (`lib/store.ts`) feeds every screen. Approve a draft, drag a deal, complete a task — the change persists through the API and pushes to all open tabs via SSE. |
+| 🔁 **End-to-end pipeline demo** | *Simulate incoming call* runs the real ingestion pipeline — fingerprint dedup, readability check, optional OpenAI extraction — and creates a call, follow-up draft, and tasks that appear everywhere instantly. |
+| ✅ **Human-gated follow-ups** | Drafts are grounded in the transcript and require explicit approval. Reject preserves the Gmail copy for editing. Approve is idempotent — no double-sends. |
+| 🗂️ **Pipeline as a visual** | Deals are a drag-and-drop kanban with live stage/value sums, search, filters, and one-click deal creation. |
+| 🧠 **Guardrail-first AI** | Extraction only records facts supported by the transcript. Stages move only on explicit signals; unstated due dates are "unspecified", never invented. |
+| 📱 **Responsive UI** | Desktop nav, mobile hamburger menu, and breakpoint-tuned layouts on every page. |
+| 🔒 **Secrets-safe by default** | `.env` is gitignored, `.env.example` holds placeholders only, and no credential ever ships in source control. |
+
+---
+
+## Screens
+
+The dashboard implements the design system prototyped in [`stitch_dynamic_interface_studio/`](./stitch_dynamic_interface_studio/):
+
+| Activity Feed | Call Review |
+|---|---|
+| ![Activity feed](stitch_dynamic_interface_studio/activity_feed_reimagined/screen.png) | ![Call review](stitch_dynamic_interface_studio/call_review_reimagined/screen.png) |
+
+| Deal Pipeline | Daily Focus (Tasks) |
+|---|---|
+| ![Deal pipeline](stitch_dynamic_interface_studio/deal_pipeline_reimagined/screen.png) | ![Tasks](stitch_dynamic_interface_studio/tasks_reimagined/screen.png) |
+
+---
+
+## See it in action (live demo)
+
+The default interface is a visibly labelled **Demo Workspace** — no customer data, no OAuth, no Postgres, no OpenAI key required. Open `http://localhost:3000` and try:
+
+1. **Activity Feed** → click **Simulate incoming call**. Watch a transcript get fingerprinted, extracted, drafted, and pushed to every open tab: the call appears in Recent activity, a new follow-up lands in Pending approvals, tasks appear in Daily Focus, and the "calls logged" counter ticks up.
+2. **Approve & Send** a pending draft → the card disappears, "drafts sent" increments, and a `Follow-up sent` event lands in the feed.
+3. **Stark Ind. Pilot Sync** → **Provide Input** → the flagged call is resolved and marked processed.
+4. **Pipeline** → drag a deal between stages (column sums recalculate live) or **Create Deal** from the header.
+5. **Tasks** → toggle, add, and delete tasks — optimistic updates sync with the server.
+6. Open the same app in two tabs → changes in one tab appear in the other in real time.
 
 ---
 
 ## Architecture
 
-The product is a scheduled ingestion-and-extraction pipeline behind a conventional SaaS dashboard. A worker sweeps Gmail and Drive every five minutes, deduplicates transcripts by fingerprint, extracts structured facts with an LLM, and writes to the CRM — while the dashboard (this app) reads and writes the same data through a Core API.
+The product is a scheduled ingestion-and-extraction pipeline behind a conventional SaaS dashboard. A worker sweeps Gmail and Drive on a fixed cadence, deduplicates transcripts by fingerprint, extracts structured facts with an LLM, and writes to the CRM — while the dashboard reads and writes the same data through a Core API.
 
 ```mermaid
 flowchart LR
@@ -65,7 +101,7 @@ flowchart LR
 
     subgraph Data["Data Layer"]
         PG[("Primary DB<br/>Postgres")]
-        QUEUE[[("Job Queue<br/>Redis / BullMQ")]]
+        QUEUE[("Job Queue<br/>Redis / BullMQ")]
         BLOB[("Object Storage<br/>links and attachments")]
     end
 
@@ -122,7 +158,7 @@ flowchart TB
     MT["Meeting Tool<br/>Zoom, Gong, Fireflies, Fathom, Otter"] -->|transcript email| GM["Gmail"]
     MT -->|transcript file| GD["Google Drive"]
 
-    SCH([("5-minute Sweep")]) --> GMW["Gmail Watcher"]
+    SCH["5-minute Sweep"] --> GMW["Gmail Watcher"]
     SCH --> GDW["Drive Watcher"]
     GM --> GMW
     GD --> GDW
@@ -154,6 +190,18 @@ flowchart TB
     SEND --> PCDB
     STAY --> PCDB
 ```
+
+### Guardrails at a glance
+
+| Stage | Guardrail it enforces |
+|---|---|
+| Fingerprint & dedup | A call seen by both email and Drive produces one write, not two |
+| Readability classifier | An unreadable transcript gets a plain notice, never a silent drop |
+| Attendee classifier | Internal-only calls generate zero CRM noise |
+| Deal & contact matcher | Ambiguous matches go to a human; the system never guesses |
+| Stage signal detector | The stage only moves on an explicit, quotable line in the transcript |
+| Task generator | An unstated due date is written as "unspecified", never invented |
+| Draft + recap | Nothing client-facing sends without an explicit approve |
 
 ---
 
@@ -343,7 +391,7 @@ erDiagram
     USER ||--o{ TASK : owns
 ```
 
-`PROCESSED_CALL` sits outside the "system of record" boundary — it is Gravity's own memory (the dedup/state ledger) regardless of where the deal itself lives, and it is the single mechanism that turns a re-run of the same sweep window into a no-op instead of a duplicate. The canonical Prisma schema lives in `prisma/schema.prisma`.
+`PROCESSED_CALL` sits outside the "system of record" boundary — it is Gravity's own memory (the dedup/state ledger) regardless of where the deal itself lives, and it is the single mechanism that turns a re-run of the same sweep window into a no-op instead of a duplicate. The canonical Prisma schema lives in [`prisma/schema.prisma`](./prisma/schema.prisma).
 
 ---
 
@@ -387,7 +435,7 @@ erDiagram
 │       └── index.ts                # Worker entry point
 ├── prisma/schema.prisma            # Production Postgres schema
 ├── hubspot-app/callforge/          # CallForge HubSpot marketplace app
-├── stitch_dynamic_interface_studio/# Design references (HTML prototypes)
+├── stitch_dynamic_interface_studio/# Design references (HTML prototypes + screens)
 ├── gravity-technical-architecture-document.md
 ├── sales-call-logger-followup-drafter-prd.md
 ├── OAUTH_CREDENTIALS_SETUP.md
@@ -399,69 +447,67 @@ erDiagram
 
 ## Technology stack
 
-| Layer | Choice |
-|---|---|
-| Frontend | Next.js (App Router) + React 19 + TypeScript |
-| Styling | Hand-rolled design system (`app/globals.css`), Material Symbols Outlined icons |
-| Backend API | Next.js route handlers backed by an in-memory live store |
-| Realtime | Server-Sent Events (`/api/events`) + 4s polling fallback |
-| Worker | `tsx`-run pipeline (`worker/src/pipeline.ts`), OpenAI extraction, Zod validation |
-| Database (production) | PostgreSQL via Prisma (`prisma/schema.prisma`) |
-| Testing | Vitest (`lib/store.test.ts`) |
+| Layer | Choice | Why |
+|---|---|---|
+| Frontend | Next.js (App Router) + React 19 + TypeScript | Tabbed, per-record navigation fits App Router; strict typing keeps the data model honest |
+| Styling | Hand-rolled design system (`app/globals.css`) | Sharp, low-noise components; Material Symbols Outlined icons; responsive breakpoints |
+| Backend API | Next.js route handlers + in-memory live store | Zero-infrastructure demo that behaves like a real backend: persist, validate, notify |
+| Realtime | Server-Sent Events (`/api/events`) + 4s polling fallback | Push updates to every open tab; polling keeps state consistent if the stream drops |
+| Extraction | OpenAI (`worker/src/pipeline.ts`), Zod validation | Structured, schema-validated JSON — guardrails enforceable in code, not just prompts |
+| Database (production) | PostgreSQL via Prisma | Relational by nature — deals have contacts, calls have tasks; one store, one schema |
+| Testing | Vitest | Fast unit tests for the store's invariants (idempotency, validation, eventing) |
 
 ---
 
 ## Getting started
 
+### Prerequisites
+
+- **Node.js 18+** (developed against Node 24)
+- **npm**
+
 > **Windows note:** this repository lives in a folder path that can contain `&` and spaces, which breaks npm's `.cmd` shims. All npm scripts invoke `node` directly to avoid that. Use the npm scripts below rather than bare binaries like `npx vitest`.
 
-1. **Install dependencies**
+### 1. Install dependencies
 
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
-2. **Configure environment**
+### 2. Configure environment
 
-   Copy `.env.example` to `.env` and fill in real values. `.env` is gitignored — never commit real secrets.
+Copy `.env.example` to `.env` and fill in real values. `.env` is gitignored — never commit real secrets.
 
-   ```bash
-   cp .env.example .env
-   ```
+```bash
+cp .env.example .env
+```
 
-3. **Run the dev server**
+For the **demo workspace you need nothing else** — the in-memory store runs without any environment variables. Live LLM extraction and external integrations only engage when their credentials are present.
 
-   ```bash
-   npm run dev
-   ```
+### 3. Run the dev server
 
-   Open `http://localhost:3000`. You land on the Activity Feed; use the *Simulate incoming call* button to watch the pipeline run live.
+```bash
+npm run dev
+```
 
-4. **Other scripts**
+Open `http://localhost:3000`. You land on the Activity Feed; use the *Simulate incoming call* button to watch the pipeline run live.
 
-   | Command | What it does |
-   |---|---|
-   | `npm run dev` | Start the Next.js dev server |
-   | `npm run build` | Production build (includes type checking) |
-   | `npm run start` | Serve the production build |
-   | `npm run lint` | TypeScript typecheck (`tsc --noEmit`) |
-   | `npm test` | Run the Vitest suite |
-   | `npm run worker` | Run the ingestion worker (demo mode) |
+### Scripts
 
----
-
-## Live demo workspace
-
-The default interface is a visibly labelled **Demo Workspace** — it uses no customer data and needs no OAuth, Postgres, or OpenAI credentials to run. It is fully interactive and real-time:
-
-- **Single source of truth** — `lib/store.ts` holds all state (deals, calls, drafts, tasks, integrations, config, event log, stats). Every API route reads/writes this store, and the store lives on `globalThis` so every Next.js dev bundle and HMR reload shares one database.
-- **Real-time push** — any mutation bumps a version counter and notifies SSE subscribers; every open tab refreshes instantly. A 4s polling fallback keeps things consistent if the stream drops.
-- **End-to-end pipeline demo** — *Simulate incoming call* (`POST /api/demo/sweep`) runs the real worker pipeline (fingerprint dedup → readability check → optional real OpenAI extraction when `OPENAI_API_KEY` is set, else a grounded canned extraction) and creates a call, a follow-up draft, and tasks that appear across Activity, Pipeline, Tasks, and Call Detail.
-- **Optimistic UI** — checkboxes and other fast interactions update instantly and reconcile with the server.
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start the Next.js dev server (hot reload) |
+| `npm run build` | Production build (includes type checking) |
+| `npm run start` | Serve the production build |
+| `npm run lint` | TypeScript typecheck (`tsc --noEmit`) |
+| `npm test` | Run the Vitest suite |
+| `npm run worker` | Run the ingestion worker (demo mode) |
 
 ---
 
-## API surface
+## API reference
+
+### Core endpoints
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -481,22 +527,42 @@ The default interface is a visibly labelled **Demo Workspace** — it uses no cu
 | `POST` | `/api/demo/sweep` | Run a simulated pipeline sweep |
 | `GET` | `/api/activity` | Activity feed payload (backward compatible) |
 
----
+### Example — run the pipeline sweep
 
-## Environment variables
+```bash
+curl -X POST http://localhost:3000/api/demo/sweep
+```
 
-See `.env.example` for the full template:
+```json
+{
+  "duplicate": false,
+  "call": { "id": "call_0a0f3452", "title": "TechFlow Architecture Review", "source": "Zoom", "dealId": "deal_techflow" },
+  "draft": { "id": "draft_0a0f3452", "status": "awaiting_approval", "to": "nina.patel@techflow.io" },
+  "fingerprint": "3f2c9d1e..."
+}
+```
 
-| Variable | Required for | Notes |
-|---|---|---|
-| `DATABASE_URL` | Production Postgres (Prisma) | Not needed for the in-memory demo |
-| `OPENAI_API_KEY` | Live LLM extraction | Without it, the demo sweep uses grounded canned extraction |
-| `OPENAI_MODEL` | Live LLM extraction | Default `gpt-4.1-mini` |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Gmail/Drive/Sheets OAuth | See `OAUTH_CREDENTIALS_SETUP.md` |
-| `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` | Slack recap/approvals | See `OAUTH_CREDENTIALS_SETUP.md` |
-| `HUBSPOT_CLIENT_ID` / `HUBSPOT_CLIENT_SECRET` | HubSpot CRM | See `OAUTH_CREDENTIALS_SETUP.md` |
-| `TOKEN_ENCRYPTION_KEY` | OAuth token encryption | 32-byte base64 key |
-| `CRON_SECRET` | Sweep scheduler auth | Random secret |
+### Example — approve a follow-up (idempotent)
+
+```bash
+curl -X POST http://localhost:3000/api/drafts/draft_acme/approve
+```
+
+A second approval returns the same draft without double-counting stats or re-sending.
+
+### Example — real-time subscription
+
+```bash
+curl -N http://localhost:3000/api/events
+```
+
+```
+data: {"version":1}
+
+data: {"version":2}
+```
+
+Every mutation bumps `version`; clients refetch `/api/state` on each event.
 
 ---
 
@@ -506,7 +572,28 @@ See `.env.example` for the full template:
 npm test
 ```
 
-The suite (`lib/store.test.ts`) covers seed consistency, draft update/approve/reject (including approve idempotency), deal stage moves and validation, task lifecycle, integration toggles, config merges, call input resolution, stats accounting, and subscriber notifications.
+The suite (`lib/store.test.ts`) covers the store's invariants:
+
+- **Seeding** — demo data is consistent (stats, events, entities)
+- **Draft lifecycle** — edit persists; approve transitions and **increments stats exactly once** (idempotency asserted); reject transitions
+- **Deals** — valid stage moves, invalid stages rejected, creation validation, event logging
+- **Tasks** — create, complete, delete; required-field validation
+- **Integrations & config** — toggles flip and log events; config merges without clobbering
+- **Calls** — input resolution marks processed and records the answer; blank input rejected
+- **Live notifications** — subscribers are notified on change and unsubscribable
+
+---
+
+## Worker & pipeline internals
+
+`worker/src/pipeline.ts` contains the deterministic core:
+
+- **`fingerprint(transcript)`** — SHA-256 of sorted attendees + call timestamp + transcript body. The same call arriving via email and Drive produces one write, not two.
+- **`isReadable(body)`** — an unreadable (too-short/garbled) transcript is flagged, never silently dropped.
+- **`isInternalOnly(attendees, domain)`** — internal-only calls log as skipped with zero CRM/Slack noise.
+- **`extractTranscript(transcript)`** — calls the OpenAI model with a strict system prompt and validates the response against the Zod schema in `worker/src/contracts.ts` before anything is written.
+
+The demo sweep (`POST /api/demo/sweep`) runs these functions end-to-end against canned transcripts, falling back to grounded canned extraction when `OPENAI_API_KEY` is not set — so the full flow is testable without credentials.
 
 ---
 
@@ -514,14 +601,35 @@ The suite (`lib/store.test.ts`) covers seed consistency, draft update/approve/re
 
 - The **Prisma schema is the system of record** and scopes all data by workspace (`prisma/schema.prisma`). The in-memory demo store is single-process; swap it for the Prisma-backed models for persistent, multi-instance production.
 - **OAuth token encryption**, Gmail/Drive/Slack/HubSpot transport adapters, queue infrastructure, and signed Slack request verification must be configured with production secrets before deployment — never place those values in source control.
-- The worker (`worker/src/pipeline.ts`) contains the deterministic transcript guardrails and validated OpenAI extraction. No code path in this design sends a client-facing email without an explicit approval.
-- **Credential hygiene:** `.env` is gitignored; `.env.example` must only ever contain placeholders.
+- **Credential hygiene:** `.env` is gitignored; `.env.example` must only ever contain placeholders. `.freebuff/`, `.next/`, and build artifacts are ignored too.
+- **Idempotency by design:** the fingerprint uniqueness constraint and the idempotent approve endpoint mean re-runs never double-write and re-clicks never double-send.
+- **Timeouts never escalate to auto-send.** A pending approval or disambiguation gets exactly one reminder; after that it simply sits — indefinitely if needed.
+
+---
+
+## Roadmap
+
+- **In-app approval as the primary surface, Slack as a companion** — Slack and dashboard approvals reading/writing the same state (they already share the store today).
+- **Editable-draft pattern** — if rejections mostly mean "let me tweak this", instrument for reject-reason and time-to-manual-send.
+- **Native CRM task objects** where the connected CRM supports them, instead of only the internal `TASK` table.
+- **Remembered deal-matching corrections** — a standing mapping so the same ambiguous match never resurfaces.
+- **Production persistence** — swap the in-memory store for the Prisma/Postgres models with migrations and a seed script.
+
+---
+
+## Contributing
+
+1. Fork the repository and create a feature branch.
+2. Make changes and add tests for any store/API behavior you touch.
+3. Run `npm test` and `npm run lint` (both are Windows-shim-safe).
+4. Open a pull request describing the *why* — the guardrails above exist to keep the pipeline honest.
 
 ---
 
 ## Related documents
 
-- [`gravity-technical-architecture-document.md`](./gravity-technical-architecture-document.md) — full technical architecture
-- [`sales-call-logger-followup-drafter-prd.md`](./sales-call-logger-followup-drafter-prd.md) — product requirements
-- [`OAUTH_CREDENTIALS_SETUP.md`](./OAUTH_CREDENTIALS_SETUP.md) — registering Google/Slack/HubSpot credentials
-- [`hubspot-app/callforge/`](./hubspot-app/callforge/) — CallForge HubSpot marketplace app
+- [`gravity-technical-architecture-document.md`](./gravity-technical-architecture-document.md) — the full technical architecture (this README's diagrams are drawn from it)
+- [`sales-call-logger-followup-drafter-prd.md`](./sales-call-logger-followup-drafter-prd.md) — product requirements & guardrail definitions
+- [`OAUTH_CREDENTIALS_SETUP.md`](./OAUTH_CREDENTIALS_SETUP.md) — registering Google, Slack, and HubSpot credentials
+- [`stitch_dynamic_interface_studio/`](./stitch_dynamic_interface_studio/) — design system (`gravity/DESIGN.md`) and HTML prototypes
+- [`hubspot-app/callforge/`](./hubspot-app/callforge/) — the CallForge HubSpot marketplace app
