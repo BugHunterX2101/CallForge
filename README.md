@@ -48,16 +48,18 @@ The dashboard is a **fully interactive, real-time workspace**: every screen read
 
 ---
 
-## See it in action (live demo)
+## Real-time data flow
 
-The default interface is a visibly labelled **Demo Workspace** — no customer data, no OAuth, no Postgres, no OpenAI key required. Open `http://localhost:3000` and try:
+Every screen renders the same live snapshot served by the backend, so what you see is exactly what the API holds:
 
-1. **Activity Feed** → click **Simulate incoming call**. Watch a transcript get fingerprinted, extracted, drafted, and pushed to every open tab: the call appears in Recent activity, a new follow-up lands in Pending approvals, tasks appear in Daily Focus, and the "calls logged" counter ticks up.
-2. **Approve & Send** a pending draft → the card disappears, "drafts sent" increments, and a `Follow-up sent` event lands in the feed.
-3. **Stark Ind. Pilot Sync** → **Provide Input** → the flagged call is resolved and marked processed.
-4. **Pipeline** → drag a deal between stages (column sums recalculate live) or **Create Deal** from the header.
-5. **Tasks** → toggle, add, and delete tasks — optimistic updates sync with the server.
-6. Open the same app in two tabs → changes in one tab appear in the other in real time.
+1. **One source of truth** — `lib/store.ts` holds all state (deals, calls, drafts, tasks, integrations, config, event log, stats) in a `globalThis` singleton, so every API route handler and every dev-mode HMR reload reads and writes the same database.
+2. **Mutations go through the API** — create/move a deal, approve or reject a draft, resolve missing input, toggle an integration: each action hits a REST endpoint that validates, mutates the store, and bumps a monotonically increasing `version` counter.
+3. **Push updates** — `/api/events` is a Server-Sent Events stream; on every version bump it notifies all connected clients, which refetch `/api/state` and re-render. A 4-second polling fallback keeps tabs in sync if the stream drops.
+4. **Optimistic UI** — fast interactions (e.g., task checkboxes) update the view instantly and then reconcile with the server's response, reverting on failure.
+5. **Verified end-to-end outcomes** — the behavior below is exercised by the test suite and the running app:
+   - A pipeline sweep (`POST /api/demo/sweep`) runs fingerprint dedup → readability check → extraction → writes, producing one new call, one `awaiting_approval` follow-up draft, and its tasks, and increments the `callsLogged` stat.
+   - Approving a draft transitions it to `sent`, increments `draftsSent` exactly once (the endpoint is idempotent), and appends a `Follow-up sent` event to the feed.
+   - Dragging a deal between pipeline stages persists the new stage through the API, and column value sums recalculate from the live snapshot.
 
 ---
 
