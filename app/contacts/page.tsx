@@ -45,7 +45,7 @@ export default function Contacts() {
                   <label>Account</label>
                   {c.account}
                 </span>
-                <span>
+                <span className="contact-email">
                   <label>Email</label>
                   <a href={`mailto:${c.email}`}>{c.email}</a>
                 </span>
