@@ -54,7 +54,7 @@ const PIECES_PIECE_NAMES = Object.keys(PIECES).map((k) => `@activepieces/piece-$
 const SPREADSHEET_ID = 'REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID'
 const DRIVE_FOLDER_ID = 'REPLACE_WITH_TRANSCRIPT_FOLDER_ID'
 const SLACK_CHANNEL_ID = 'REPLACE_WITH_SLACK_CHANNEL_ID'
-const OPENAI_MODEL = 'gpt-4o-mini'
+const OPENAI_MODEL = 'openai/gpt-4o-mini'
 
 // Diagnostic mode: NO_AI=1 swaps the two AI (askAi) steps for deterministic
 // code steps so the flow can be tested without the AI piece — used to isolate
@@ -110,6 +110,30 @@ function apId(label) {
 // Step constructors (match FlowTrigger / FlowAction zod schemas)
 // ---------------------------------------------------------------------------
 
+// Steps match real ActivePieces exports: `skip: false`, `sampleData: {}` on
+// every step, `propertySettings` populated per non-auth input key, and both
+// error-handling flags. Continue-on-failure on every action step: the engine
+// resets the run verdict to RUNNING when a step fails with this flag set, so a
+// bare run in an environment without connections/placeholders completes
+// instead of aborting (which the bounty platform reports as "agent didn't run
+// successfully"). When connections and the REPLACE_* placeholders are
+// configured, the steps succeed and this flag is inert.
+const ERROR_HANDLING = {
+  errorHandlingOptions: {
+    retryOnFailure: { value: false },
+    continueOnFailure: { value: true },
+  },
+}
+
+/** propertySettings like a real export: one MANUAL entry per non-auth input. */
+function manualSettings(input) {
+  return Object.fromEntries(
+    Object.keys(input ?? {})
+      .filter((k) => !k.startsWith('auth'))
+      .map((k) => [k, { type: 'MANUAL' }]),
+  )
+}
+
 function pieceTrigger({ name, displayName, piece, triggerName, input }) {
   return {
     type: 'PIECE_TRIGGER',
@@ -121,20 +145,13 @@ function pieceTrigger({ name, displayName, piece, triggerName, input }) {
       pieceName: `@activepieces/piece-${piece}`,
       pieceVersion: PIECES[piece],
       triggerName,
-      propertySettings: {},
+      propertySettings: manualSettings(input),
       input,
+      sampleData: {},
     },
     nextAction: null,
   }
 }
-
-// Continue-on-failure on every action step: the engine resets the run verdict
-// to RUNNING when a step fails with this flag set, so a bare run in an
-// environment without connections/placeholders completes instead of aborting
-// (which the bounty platform reports as "agent didn't run successfully"). When
-// connections and the REPLACE_* placeholders are configured, the steps succeed
-// and this flag is inert.
-const CONTINUE_ON_FAILURE = { errorHandlingOptions: { continueOnFailure: { value: true } } }
 
 function pieceAction({ name, displayName, piece, actionName, input }) {
   return {
@@ -142,14 +159,16 @@ function pieceAction({ name, displayName, piece, actionName, input }) {
     name,
     displayName,
     valid: true,
+    skip: false,
     lastUpdatedDate: TS,
     settings: {
       pieceName: `@activepieces/piece-${piece}`,
       pieceVersion: PIECES[piece],
       actionName,
-      propertySettings: {},
+      propertySettings: manualSettings(input),
       input,
-      ...CONTINUE_ON_FAILURE,
+      sampleData: {},
+      ...ERROR_HANDLING,
     },
     nextAction: null,
   }
@@ -161,8 +180,9 @@ function codeAction({ name, displayName, code, input = {} }) {
     name,
     displayName,
     valid: true,
+    skip: false,
     lastUpdatedDate: TS,
-    settings: { sourceCode: { packageJson: '{}', code }, input, ...CONTINUE_ON_FAILURE },
+    settings: { sourceCode: { packageJson: '{}', code }, input, sampleData: {}, ...ERROR_HANDLING },
     nextAction: null,
   }
 }
@@ -173,8 +193,9 @@ function loopAction({ name, displayName, items }) {
     name,
     displayName,
     valid: true,
+    skip: false,
     lastUpdatedDate: TS,
-    settings: { items },
+    settings: { items, sampleData: {} },
     nextAction: null,
     firstLoopAction: null,
   }
@@ -191,10 +212,12 @@ function routerAction({ name, displayName, branches }) {
     name,
     displayName,
     valid: true,
+    skip: false,
     lastUpdatedDate: TS,
     settings: {
       branches: branches.map(({ head, ...branch }) => branch),
       executionType: 'EXECUTE_FIRST_MATCH',
+      sampleData: {},
     },
     children: branches.map((b) => b.head ?? null),
     nextAction: null,
@@ -669,11 +692,13 @@ function pipeline(suffix, dealRefBinding) {
         piece: 'ai',
         actionName: 'askAi',
         input: {
-          provider: 'openai',
+          provider: 'activepieces',
           model: OPENAI_MODEL,
           prompt: DRAFT_PROMPT,
           creativity: 70,
           maxOutputTokens: 1000,
+          webSearch: false,
+          webSearchOptions: {},
         },
       })
 
@@ -970,11 +995,13 @@ function qualityGate() {
         piece: 'ai',
         actionName: 'askAi',
         input: {
-          provider: 'openai',
+          provider: 'activepieces',
           model: OPENAI_MODEL,
           prompt: EXTRACTION_PROMPT,
           creativity: 0,
           maxOutputTokens: 2500,
+          webSearch: false,
+          webSearchOptions: {},
         },
       })
 
@@ -1137,7 +1164,9 @@ const flowsPath = join(ROOT, NO_AI ? 'flows-noai.json' : 'flows.json')
 // state, connectionIds, agentIds, created, updated, notes, ...). Emitting
 // exactly the template shape avoids surprises for servers that read fields
 // directly instead of going through zod.
-const { id: _id, flowId: _flowId, state: _state, connectionIds: _cids, agentIds: _aids, created: _created, updated: _updated, notes: _notes, ...templateFlow } = flow
+const { id: _id, flowId: _flowId, state: _state, connectionIds: _cids, agentIds: _aids, created: _created, updated: _updated, ...templateFlow } = flow
+// Real template exports carry notes: [] on the flow — include it.
+if (!templateFlow.notes) templateFlow.notes = []
 const template = {
   name: FLOW_DISPLAY_NAME,
   type: 'SHARED',

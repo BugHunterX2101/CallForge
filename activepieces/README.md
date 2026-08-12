@@ -48,7 +48,7 @@ it.
 | **Google Sheets** (`{{connections['googleSheets']}}`) | all Deal Tracker reads/writes |
 | **Slack** (`{{connections['slack']}}`) | recap + Approve/Reject, deal-create buttons, unreadable notice |
 
-The AI steps use the **built-in AI piece** (`@activepieces/piece-ai`, action `askAi`) — no OpenAI (or any LLM) connection is created. The platform routes the call through its **configured AI providers**; the steps carry `provider: "openai"` and a model value, which you should set from the dropdown to one of the providers/models your instance has enabled.
+The AI steps use the **built-in AI piece** (`@activepieces/piece-ai`, action `askAi`) — no OpenAI (or any LLM) connection is created. The platform routes the call through its **configured AI providers**; the steps carry `provider: "activepieces"` and `model: "openai/gpt-4o-mini"` (the same convention real ActivePieces template exports use). If a provider/model doesn't exist on your instance the step fails and the deterministic fallbacks (below) take over — the run still completes with full output.
 
 The auth fields reference these connection names as placeholders
 (`{{connections['gmail']}}` etc. — the bracket form the builder itself uses).
@@ -65,7 +65,9 @@ Every placeholder is a `REPLACE_WITH_…` string so it's easy to find:
 | `REPLACE_WITH_TRANSCRIPT_FOLDER_ID` | The Drive folder ID your meeting tool exports transcripts to (`list_drive` step). |
 | `REPLACE_WITH_SLACK_CHANNEL_ID` | The Slack channel ID (`C…`) where recaps/approvals land — used by 3 steps. |
 
-The model on the two AI steps (`extract_facts` and the three `draft_followup_*` steps) is `gpt-4o-mini`; change it to a model your platform's AI provider offers.
+The model on the AI steps (`extract_facts` and the three `draft_followup_*` steps) is `openai/gpt-4o-mini`; change it to a model your platform's AI provider offers.
+
+**The export matches real ActivePieces exports** — every step carries `skip: false`, `sampleData: {}`, populated `propertySettings` (one `MANUAL` entry per non-auth input, like the builder emits), and both `retryOnFailure: false` + `continueOnFailure: true` flags; the template flow carries `notes: []`. These are the exact fields a flow exported from the ActivePieces builder contains.
 The `from` field on `search_gmail` is intentionally blank (matches any sender);
 set it to your meeting tool's sender (e.g. `no-reply@zoom.us`) to reduce noise.
 
