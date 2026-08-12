@@ -38,7 +38,8 @@ on npm (see "Schema & versions").
 | **Google Drive** (`{{connections.googleDrive}}`) | `drive_list_files` |
 | **Google Sheets** (`{{connections.googleSheets}}`) | all Deal Tracker reads/writes |
 | **Slack** (`{{connections.slack}}`) | recap + Approve/Reject, deal-create buttons, unreadable notice |
-| **OpenAI** (`{{connections.openai}}`) | fact extraction + follow-up drafting |
+
+The AI steps use the **built-in AI piece** (`@activepieces/piece-ai`, action `askAi`) — no OpenAI (or any LLM) connection is created. The platform routes the call through its **configured AI providers**; the steps carry `provider: "openai"` and a model value, which you should set from the dropdown to one of the providers/models your instance has enabled.
 
 The auth fields reference these connection names as placeholders
 (`{{connections.gmail}}` etc.). Select the connection you created on each step
@@ -55,7 +56,7 @@ Every placeholder is a `REPLACE_WITH_…` string so it's easy to find:
 | `REPLACE_WITH_TRANSCRIPT_FOLDER_ID` | The Drive folder ID your meeting tool exports transcripts to (`list_drive` step). |
 | `REPLACE_WITH_SLACK_CHANNEL_ID` | The Slack channel ID (`C…`) where recaps/approvals land — used by 3 steps. |
 
-The model on the two OpenAI steps is `gpt-4o-mini`; change it if you prefer.
+The model on the two AI steps (`extract_facts` and the three `draft_followup_*` steps) is `gpt-4o-mini`; change it to a model your platform's AI provider offers.
 The `from` field on `search_gmail` is intentionally blank (matches any sender);
 set it to your meeting tool's sender (e.g. `no-reply@zoom.us`) to reduce noise.
 
@@ -99,9 +100,9 @@ Runs on a **scheduled sweep every 5 minutes** (PRD §6, §9.1). Each sweep:
 7. **Readability gate** — teaser/link-only/garbled transcripts get a plain
    "couldn't process" Slack notice and a `_ProcessedCalls` row (§12) — never a
    silent drop.
-8. **AI extraction** (OpenAI) — summary, verbatim objections & commitments,
-   next steps with conservative owners/dates, an explicit stage signal only,
-   external attendee, suggested account.
+8. **AI extraction** (built-in AI piece) — summary, verbatim objections &
+   commitments, next steps with conservative owners/dates, an explicit stage
+   signal only, external attendee, suggested account.
 9. **Attendee gate** — internal-only calls are logged as skipped with zero CRM
    or Slack noise (§9.6).
 10. **Deal gate** — a match on the Deals tab proceeds; no match posts a Slack
@@ -190,7 +191,7 @@ Piece versions are pinned to the published packages:
 | `@activepieces/piece-google-drive` | 0.8.3 |
 | `@activepieces/piece-google-sheets` | 0.16.7 |
 | `@activepieces/piece-slack` | 0.17.8 |
-| `@activepieces/piece-openai` | 0.10.3 |
+| `@activepieces/piece-ai` (built-in AI) | 0.6.0 |
 
 Bindings use the current `{{stepName.output.field}}` syntax; code steps use the
 `export const code = async (params) => ({...})` contract.

@@ -16,7 +16,7 @@
     "@activepieces/piece-googleDrive",
     "@activepieces/piece-googleSheets",
     "@activepieces/piece-slack",
-    "@activepieces/piece-openai"
+    "@activepieces/piece-ai"
   ],
   "flows": [
     {
@@ -302,23 +302,16 @@
                                     "valid": true,
                                     "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                     "settings": {
-                                      "pieceName": "@activepieces/piece-openai",
-                                      "pieceVersion": "0.10.3",
-                                      "actionName": "ask_chatgpt",
+                                      "pieceName": "@activepieces/piece-ai",
+                                      "pieceVersion": "0.6.0",
+                                      "actionName": "askAi",
                                       "propertySettings": {},
                                       "input": {
-                                        "auth": "{{connections.openai}}",
+                                        "provider": "openai",
                                         "model": "gpt-4o-mini",
-                                        "prompt": "Analyze the sales call transcript below and return ONLY valid JSON with this exact shape:\n{\n  \"summary\": \"string — 3-6 sentences covering what was discussed and decided\",\n  \"objections\": [\"string — verbatim objections raised by the customer\"],\n  \"commitments\": [\"string — verbatim promises made on either side\"],\n  \"nextSteps\": [{\"task\": \"string\", \"owner\": \"REP | CLIENT | OTHER\", \"dueDate\": \"YYYY-MM-DD or Not specified\"}],\n  \"stageSignal\": null | {\"signal\": \"exact quote from the transcript\", \"newStage\": \"string\"},\n  \"externalAttendee\": \"customer email if any, else empty string\",\n  \"suggestedAccount\": \"customer company name if stated, else empty string\"\n}\n\nRules:\n- Quote objections and commitments verbatim — never paraphrase or soften.\n- Never invent a due date. Use \"Not specified\" when none is stated or reasonably inferable.\n- Only set stageSignal when there is an explicit, quotable signal to move the deal forward.\n- nextSteps: capture every stated or clearly implied next step; leave owner/dueDate conservative.\n\nTranscript:\n{{pick_candidate.output.candidate.body}}",
-                                        "temperature": 0,
-                                        "maxTokens": 2500,
-                                        "topP": 1,
-                                        "roles": [
-                                          {
-                                            "role": "system",
-                                            "content": "You are a rigorous sales-call analyst. You extract facts ONLY from the transcript provided. Never invent, soften, or infer beyond what was said.\n- Objections and commitments must be quoted verbatim in the caller's language.\n- A due date that is not stated or reasonably inferable is recorded as \"Not specified\" — never guessed.\n- A stage change signal only exists when someone explicitly asks to move forward, requests a contract, etc. Otherwise stageSignal is null.\n- If every participant is internal (no external customer email), externalAttendee is an empty string.\n- suggestedAccount is the customer's company name as stated in the call, or \"\" if unknown.\nRespond with ONLY valid JSON."
-                                          }
-                                        ]
+                                        "prompt": "You are a rigorous sales-call analyst. You extract facts ONLY from the transcript provided. Never invent, soften, or infer beyond what was said.\n- Objections and commitments must be quoted verbatim in the caller's language.\n- A due date that is not stated or reasonably inferable is recorded as \"Not specified\" — never guessed.\n- A stage change signal only exists when someone explicitly asks to move forward, requests a contract, etc. Otherwise stageSignal is null.\n- If every participant is internal (no external customer email), externalAttendee is an empty string.\n- suggestedAccount is the customer's company name as stated in the call, or \"\" if unknown.\n\nAnalyze the sales call transcript below and return ONLY valid JSON with this exact shape:\n{\n  \"summary\": \"string — 3-6 sentences covering what was discussed and decided\",\n  \"objections\": [\"string — verbatim objections raised by the customer\"],\n  \"commitments\": [\"string — verbatim promises made on either side\"],\n  \"nextSteps\": [{\"task\": \"string\", \"owner\": \"REP | CLIENT | OTHER\", \"dueDate\": \"YYYY-MM-DD or Not specified\"}],\n  \"stageSignal\": null | {\"signal\": \"exact quote from the transcript\", \"newStage\": \"string\"},\n  \"externalAttendee\": \"customer email if any, else empty string\",\n  \"suggestedAccount\": \"customer company name if stated, else empty string\"\n}\n\nRules:\n- Quote objections and commitments verbatim — never paraphrase or soften.\n- Never invent a due date. Use \"Not specified\" when none is stated or reasonably inferable.\n- Only set stageSignal when there is an explicit, quotable signal to move the deal forward.\n- nextSteps: capture every stated or clearly implied next step; leave owner/dueDate conservative.\n\nTranscript:\n{{pick_candidate.output.candidate.body}}",
+                                        "creativity": 0,
+                                        "maxOutputTokens": 2500
                                       }
                                     },
                                     "nextAction": {
@@ -330,7 +323,7 @@
                                       "settings": {
                                         "sourceCode": {
                                           "packageJson": "{}",
-                                          "code": "export const code = async (params) => {\n  const raw = String(params.extract_facts?.choices?.[0]?.message?.content ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    // Never drop a call silently: degrade to a raw summary, no invented facts.\n    p = { summary: raw.slice(0, 2000), objections: [], commitments: [], nextSteps: [], stageSignal: null, externalAttendee: '', suggestedAccount: '' };\n  }\n  const tasks = (Array.isArray(p.nextSteps) ? p.nextSteps : [])\n    .map((t) => ({\n      task: String(t?.task ?? '').trim(),\n      owner: String(t?.owner ?? 'Not specified').trim(),\n      dueDate: /^\\d{4}-\\d{2}-\\d{2}$/.test(String(t?.dueDate ?? '')) ? String(t.dueDate) : 'Not specified',\n    }))\n    .filter((t) => t.task.length > 0);\n  const externalAttendee = String(p.externalAttendee ?? '').trim();\n  const stageSignal =\n    p.stageSignal && typeof p.stageSignal === 'object' && p.stageSignal.signal\n      ? { signal: String(p.stageSignal.signal), newStage: String(p.stageSignal.newStage ?? '') }\n      : null;\n  return {\n    summary: String(p.summary ?? '').trim(),\n    objections: Array.isArray(p.objections) ? p.objections.map(String) : [],\n    commitments: Array.isArray(p.commitments) ? p.commitments.map(String) : [],\n    tasks,\n    stageSignal,\n    externalAttendee,\n    hasExternal: externalAttendee.length > 0,\n    suggestedAccount: String(p.suggestedAccount ?? '').trim(),\n  };\n};"
+                                          "code": "export const code = async (params) => {\n  // The built-in AI piece (askAi) returns the raw answer text as its output.\n  const raw = String(params.extract_facts ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    // Never drop a call silently: degrade to a raw summary, no invented facts.\n    p = { summary: raw.slice(0, 2000), objections: [], commitments: [], nextSteps: [], stageSignal: null, externalAttendee: '', suggestedAccount: '' };\n  }\n  const tasks = (Array.isArray(p.nextSteps) ? p.nextSteps : [])\n    .map((t) => ({\n      task: String(t?.task ?? '').trim(),\n      owner: String(t?.owner ?? 'Not specified').trim(),\n      dueDate: /^\\d{4}-\\d{2}-\\d{2}$/.test(String(t?.dueDate ?? '')) ? String(t.dueDate) : 'Not specified',\n    }))\n    .filter((t) => t.task.length > 0);\n  const externalAttendee = String(p.externalAttendee ?? '').trim();\n  const stageSignal =\n    p.stageSignal && typeof p.stageSignal === 'object' && p.stageSignal.signal\n      ? { signal: String(p.stageSignal.signal), newStage: String(p.stageSignal.newStage ?? '') }\n      : null;\n  return {\n    summary: String(p.summary ?? '').trim(),\n    objections: Array.isArray(p.objections) ? p.objections.map(String) : [],\n    commitments: Array.isArray(p.commitments) ? p.commitments.map(String) : [],\n    tasks,\n    stageSignal,\n    externalAttendee,\n    hasExternal: externalAttendee.length > 0,\n    suggestedAccount: String(p.suggestedAccount ?? '').trim(),\n  };\n};"
                                         },
                                         "input": {
                                           "extract_facts": "{{extract_facts.output}}"
@@ -516,27 +509,20 @@
                                                         "nextAction": {
                                                           "type": "PIECE",
                                                           "name": "draft_followup_match",
-                                                          "displayName": "Draft follow-up email",
+                                                          "displayName": "Draft follow-up email (AI)",
                                                           "valid": true,
                                                           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                           "settings": {
-                                                            "pieceName": "@activepieces/piece-openai",
-                                                            "pieceVersion": "0.10.3",
-                                                            "actionName": "ask_chatgpt",
+                                                            "pieceName": "@activepieces/piece-ai",
+                                                            "pieceVersion": "0.6.0",
+                                                            "actionName": "askAi",
                                                             "propertySettings": {},
                                                             "input": {
-                                                              "auth": "{{connections.openai}}",
+                                                              "provider": "openai",
                                                               "model": "gpt-4o-mini",
-                                                              "prompt": "Write a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
-                                                              "temperature": 0.7,
-                                                              "maxTokens": 800,
-                                                              "topP": 1,
-                                                              "roles": [
-                                                                {
-                                                                  "role": "system",
-                                                                  "content": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs)."
-                                                                }
-                                                              ]
+                                                              "prompt": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).\n\nWrite a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
+                                                              "creativity": 70,
+                                                              "maxOutputTokens": 1000
                                                             }
                                                           },
                                                           "nextAction": {
@@ -548,7 +534,7 @@
                                                             "settings": {
                                                               "sourceCode": {
                                                                 "packageJson": "{}",
-                                                                "code": "export const code = async (params) => {\n  const raw = String(params.draft_followup?.choices?.[0]?.message?.content ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    p = { email_subject: '', email_body: raw };\n  }\n  return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };\n};"
+                                                                "code": "export const code = async (params) => {\n  // The built-in AI piece (askAi) returns the raw answer text as its output.\n  const raw = String(params.draft_followup ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    p = { email_subject: '', email_body: raw };\n  }\n  return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };\n};"
                                                               },
                                                               "input": {
                                                                 "draft_followup": "{{draft_followup_match.output}}"
@@ -892,27 +878,20 @@
                                                                   "nextAction": {
                                                                     "type": "PIECE",
                                                                     "name": "draft_followup_create",
-                                                                    "displayName": "Draft follow-up email",
+                                                                    "displayName": "Draft follow-up email (AI)",
                                                                     "valid": true,
                                                                     "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                     "settings": {
-                                                                      "pieceName": "@activepieces/piece-openai",
-                                                                      "pieceVersion": "0.10.3",
-                                                                      "actionName": "ask_chatgpt",
+                                                                      "pieceName": "@activepieces/piece-ai",
+                                                                      "pieceVersion": "0.6.0",
+                                                                      "actionName": "askAi",
                                                                       "propertySettings": {},
                                                                       "input": {
-                                                                        "auth": "{{connections.openai}}",
+                                                                        "provider": "openai",
                                                                         "model": "gpt-4o-mini",
-                                                                        "prompt": "Write a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
-                                                                        "temperature": 0.7,
-                                                                        "maxTokens": 800,
-                                                                        "topP": 1,
-                                                                        "roles": [
-                                                                          {
-                                                                            "role": "system",
-                                                                            "content": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs)."
-                                                                          }
-                                                                        ]
+                                                                        "prompt": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).\n\nWrite a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
+                                                                        "creativity": 70,
+                                                                        "maxOutputTokens": 1000
                                                                       }
                                                                     },
                                                                     "nextAction": {
@@ -924,7 +903,7 @@
                                                                       "settings": {
                                                                         "sourceCode": {
                                                                           "packageJson": "{}",
-                                                                          "code": "export const code = async (params) => {\n  const raw = String(params.draft_followup?.choices?.[0]?.message?.content ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    p = { email_subject: '', email_body: raw };\n  }\n  return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };\n};"
+                                                                          "code": "export const code = async (params) => {\n  // The built-in AI piece (askAi) returns the raw answer text as its output.\n  const raw = String(params.draft_followup ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    p = { email_subject: '', email_body: raw };\n  }\n  return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };\n};"
                                                                         },
                                                                         "input": {
                                                                           "draft_followup": "{{draft_followup_create.output}}"
@@ -1171,27 +1150,20 @@
                                                               "nextAction": {
                                                                 "type": "PIECE",
                                                                 "name": "draft_followup_skip",
-                                                                "displayName": "Draft follow-up email",
+                                                                "displayName": "Draft follow-up email (AI)",
                                                                 "valid": true,
                                                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                 "settings": {
-                                                                  "pieceName": "@activepieces/piece-openai",
-                                                                  "pieceVersion": "0.10.3",
-                                                                  "actionName": "ask_chatgpt",
+                                                                  "pieceName": "@activepieces/piece-ai",
+                                                                  "pieceVersion": "0.6.0",
+                                                                  "actionName": "askAi",
                                                                   "propertySettings": {},
                                                                   "input": {
-                                                                    "auth": "{{connections.openai}}",
+                                                                    "provider": "openai",
                                                                     "model": "gpt-4o-mini",
-                                                                    "prompt": "Write a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
-                                                                    "temperature": 0.7,
-                                                                    "maxTokens": 800,
-                                                                    "topP": 1,
-                                                                    "roles": [
-                                                                      {
-                                                                        "role": "system",
-                                                                        "content": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs)."
-                                                                      }
-                                                                    ]
+                                                                    "prompt": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).\n\nWrite a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
+                                                                    "creativity": 70,
+                                                                    "maxOutputTokens": 1000
                                                                   }
                                                                 },
                                                                 "nextAction": {
@@ -1203,7 +1175,7 @@
                                                                   "settings": {
                                                                     "sourceCode": {
                                                                       "packageJson": "{}",
-                                                                      "code": "export const code = async (params) => {\n  const raw = String(params.draft_followup?.choices?.[0]?.message?.content ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    p = { email_subject: '', email_body: raw };\n  }\n  return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };\n};"
+                                                                      "code": "export const code = async (params) => {\n  // The built-in AI piece (askAi) returns the raw answer text as its output.\n  const raw = String(params.draft_followup ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    p = { email_subject: '', email_body: raw };\n  }\n  return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };\n};"
                                                                     },
                                                                     "input": {
                                                                       "draft_followup": "{{draft_followup_skip.output}}"

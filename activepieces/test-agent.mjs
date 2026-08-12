@@ -81,27 +81,19 @@ assert(readable.readable === true && readable.verdict === 'process', 'readabilit
 const teaser = await run(byName('readability_check'), { candidate: { body: 'Your transcript is ready: https://link' } })
 assert(teaser.readable === false && teaser.verdict === 'unreadable', 'readability_check rejects a teaser/link-only email')
 
-// --- parse_extraction: guardrails ---
-const extractOutput = {
-  choices: [
-    {
-      message: {
-        content: JSON.stringify({
-          summary: 'Customer wants a pilot.',
-          objections: ['We are worried about rollout time.'],
-          commitments: ['We will share security docs.'],
-          nextSteps: [
-            { task: 'Send contract', owner: 'REP', dueDate: '2026-08-20' },
-            { task: 'Follow up on pricing', owner: 'REP', dueDate: 'next week' },
-          ],
-          stageSignal: null,
-          externalAttendee: 'nina.patel@techflow.io',
-          suggestedAccount: 'TechFlow',
-        }),
-      },
-    },
+// --- parse_extraction: guardrails (askAi returns the raw answer text) ---
+const extractOutput = JSON.stringify({
+  summary: 'Customer wants a pilot.',
+  objections: ['We are worried about rollout time.'],
+  commitments: ['We will share security docs.'],
+  nextSteps: [
+    { task: 'Send contract', owner: 'REP', dueDate: '2026-08-20' },
+    { task: 'Follow up on pricing', owner: 'REP', dueDate: 'next week' },
   ],
-}
+  stageSignal: null,
+  externalAttendee: 'nina.patel@techflow.io',
+  suggestedAccount: 'TechFlow',
+})
 const parsed = await run(byName('parse_extraction'), { extract_facts: extractOutput })
 assert(parsed.summary.includes('pilot'), 'parse_extraction parses summary')
 assert(parsed.objections[0].includes('rollout'), 'parse_extraction parses objections verbatim')
@@ -111,10 +103,10 @@ assert(parsed.tasks[0].dueDate === '2026-08-20', 'parse_extraction keeps real da
 assert(parsed.hasExternal === true && parsed.externalAttendee === 'nina.patel@techflow.io', 'parse_extraction detects external attendee')
 assert(parsed.stageSignal === null, 'parse_extraction keeps null stage signal')
 const internal = await run(byName('parse_extraction'), {
-  extract_facts: { choices: [{ message: { content: JSON.stringify({ summary: 'Internal sync', objections: [], commitments: [], nextSteps: [], stageSignal: null, externalAttendee: '', suggestedAccount: '' }) } }] },
+  extract_facts: JSON.stringify({ summary: 'Internal sync', objections: [], commitments: [], nextSteps: [], stageSignal: null, externalAttendee: '', suggestedAccount: '' }),
 })
 assert(internal.hasExternal === false, 'parse_extraction flags internal-only calls')
-const garbled = await run(byName('parse_extraction'), { extract_facts: { choices: [{ message: { content: 'not json at all' } }] } })
+const garbled = await run(byName('parse_extraction'), { extract_facts: 'not json at all' })
 assert(garbled.summary === 'not json at all' && garbled.tasks.length === 0, 'parse_extraction degrades safely on non-JSON')
 
 // --- deal_match_check ---
@@ -131,7 +123,7 @@ assert(nd.dealId.startsWith('deal_'), 'new_deal_id generates a deal id')
 
 // --- parse_draft ---
 const draft = await run(byName('parse_draft_match'), {
-  draft_followup: { choices: [{ message: { content: JSON.stringify({ email_subject: 'Pilot next steps', email_body: 'Hi Nina,\n\nHere is the contract.\n\nBest' }) } }] },
+  draft_followup: JSON.stringify({ email_subject: 'Pilot next steps', email_body: 'Hi Nina,\n\nHere is the contract.\n\nBest' }),
 })
 assert(draft.emailSubject === 'Pilot next steps' && draft.emailBody.includes('contract'), 'parse_draft parses draft JSON')
 

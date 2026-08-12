@@ -41,7 +41,9 @@ const PIECES = {
   googleDrive: '0.8.3',
   googleSheets: '0.16.7',
   slack: '0.17.8',
-  openai: '0.10.3',
+  // Built-in AI piece — no direct OpenAI connection needed; the platform
+  // routes provider/model through its configured AI providers.
+  ai: '0.6.0',
 }
 
 // Piece names in the order the flow uses them (for the template's `pieces` list).
@@ -254,7 +256,8 @@ const CODE_READABILITY = `export const code = async (params) => {
 };`
 
 const CODE_PARSE_EXTRACTION = `export const code = async (params) => {
-  const raw = String(params.extract_facts?.choices?.[0]?.message?.content ?? '')
+  // The built-in AI piece (askAi) returns the raw answer text as its output.
+  const raw = String(params.extract_facts ?? '')
     .replace(/\\\`\\\`\\\`json/gi, '')
     .replace(/\\\`\\\`\\\`/g, '')
     .trim();
@@ -315,7 +318,8 @@ const CODE_PIPELINE_CTX = `export const code = async (params) => {
 };`
 
 const CODE_PARSE_DRAFT = `export const code = async (params) => {
-  const raw = String(params.draft_followup?.choices?.[0]?.message?.content ?? '')
+  // The built-in AI piece (askAi) returns the raw answer text as its output.
+  const raw = String(params.draft_followup ?? '')
     .replace(/\\\`\\\`\\\`json/gi, '')
     .replace(/\\\`\\\`\\\`/g, '')
     .trim();
@@ -332,15 +336,14 @@ const CODE_PARSE_DRAFT = `export const code = async (params) => {
 // AI prompts (guardrails from PRD §10)
 // ---------------------------------------------------------------------------
 
-const EXTRACTION_SYSTEM = `You are a rigorous sales-call analyst. You extract facts ONLY from the transcript provided. Never invent, soften, or infer beyond what was said.
+const EXTRACTION_PROMPT = `You are a rigorous sales-call analyst. You extract facts ONLY from the transcript provided. Never invent, soften, or infer beyond what was said.
 - Objections and commitments must be quoted verbatim in the caller's language.
 - A due date that is not stated or reasonably inferable is recorded as "Not specified" — never guessed.
 - A stage change signal only exists when someone explicitly asks to move forward, requests a contract, etc. Otherwise stageSignal is null.
 - If every participant is internal (no external customer email), externalAttendee is an empty string.
 - suggestedAccount is the customer's company name as stated in the call, or "" if unknown.
-Respond with ONLY valid JSON.`
 
-const EXTRACTION_PROMPT = `Analyze the sales call transcript below and return ONLY valid JSON with this exact shape:
+Analyze the sales call transcript below and return ONLY valid JSON with this exact shape:
 {
   "summary": "string — 3-6 sentences covering what was discussed and decided",
   "objections": ["string — verbatim objections raised by the customer"],
@@ -360,9 +363,9 @@ Rules:
 Transcript:
 {{pick_candidate.output.candidate.body}}`
 
-const DRAFT_SYSTEM = `You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).`
+const DRAFT_PROMPT = `You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).
 
-const DRAFT_PROMPT = `Write a follow-up email to {{parse_extraction.output.externalAttendee}} about the call "{{pick_candidate.output.candidate.subject}}" on {{pick_candidate.output.candidate.date}}.
+Write a follow-up email to {{parse_extraction.output.externalAttendee}} about the call "{{pick_candidate.output.candidate.subject}}" on {{pick_candidate.output.candidate.date}}.
 
 Reference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).
 
@@ -470,17 +473,15 @@ function pipeline(suffix, dealRefBinding) {
 
   const draftFollowup = pieceAction({
     name: S('draft_followup'),
-    displayName: 'Draft follow-up email',
-    piece: 'openai',
-    actionName: 'ask_chatgpt',
+    displayName: 'Draft follow-up email (AI)',
+    piece: 'ai',
+    actionName: 'askAi',
     input: {
-      auth: '{{connections.openai}}',
+      provider: 'openai',
       model: OPENAI_MODEL,
       prompt: DRAFT_PROMPT,
-      temperature: 0.7,
-      maxTokens: 800,
-      topP: 1,
-      roles: [{ role: 'system', content: DRAFT_SYSTEM }],
+      creativity: 70,
+      maxOutputTokens: 1000,
     },
   })
 
@@ -759,16 +760,14 @@ function qualityGate() {
   const extractFacts = pieceAction({
     name: 'extract_facts',
     displayName: 'Extract call facts (AI)',
-    piece: 'openai',
-    actionName: 'ask_chatgpt',
+    piece: 'ai',
+    actionName: 'askAi',
     input: {
-      auth: '{{connections.openai}}',
+      provider: 'openai',
       model: OPENAI_MODEL,
       prompt: EXTRACTION_PROMPT,
-      temperature: 0,
-      maxTokens: 2500,
-      topP: 1,
-      roles: [{ role: 'system', content: EXTRACTION_SYSTEM }],
+      creativity: 0,
+      maxOutputTokens: 2500,
     },
   })
 
