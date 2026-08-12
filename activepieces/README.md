@@ -16,8 +16,17 @@ platform's upload box actually wants.
 
 Every identifier inside `agent.json` — piece names, versions, action/trigger
 names, property keys, output paths, the `FLOW_VERSION` schema — was verified
-against the published `@activepieces/shared` package and the real piece bundles
-on npm (see "Schema & versions").
+against the published `@activepieces/shared` package, the real piece bundles
+on npm, and by **importing the export into a real ActivePieces server
+(`ghcr.io/activepieces/activepieces:0.87.0`)** via its own `IMPORT_FLOW` API
+(see "Schema & versions").
+
+**Important:** the flow's trigger is named `trigger` on purpose. The import
+path (`IMPORT_FLOW`) creates a fresh empty flow version whose trigger is always
+named `trigger`, then replaces it with the incoming trigger by looking up that
+name — any other trigger name fails with "Step not found", which the bounty
+platform's `prepare` endpoint surfaces as a `500 InternalError`. Do not rename
+it.
 
 ---
 

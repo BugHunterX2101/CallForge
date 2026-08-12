@@ -25,7 +25,7 @@
       "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail (and Drive) transcript sources, fingerprint dedup, AI extraction with guardrails, Slack recap + one-tap approval for the follow-up email, all writes landing in a Deal Tracker sheet.",
       "trigger": {
         "type": "PIECE_TRIGGER",
-        "name": "trigger_sweep",
+        "name": "trigger",
         "displayName": "Sweep every 5 minutes",
         "valid": true,
         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",

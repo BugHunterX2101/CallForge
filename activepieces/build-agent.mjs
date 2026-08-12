@@ -636,7 +636,11 @@ function pipeline(suffix, dealRefBinding) {
 function buildFlow() {
   // --- Trigger: scheduled sweep every 5 minutes (PRD §6, §9.1) ---
   const trigger = pieceTrigger({
-    name: 'trigger_sweep',
+    // The trigger must be named 'trigger' — the import path (IMPORT_FLOW) looks
+    // up the incoming trigger's name in the freshly created empty flow version,
+    // whose trigger is always named 'trigger'. Any other name fails with
+    // "Step not found" (which the marketplace surfaces as a 500 on prepare).
+    name: 'trigger',
     displayName: 'Sweep every 5 minutes',
     piece: 'schedule',
     triggerName: 'cron_expression',
