@@ -623,3 +623,4 @@ The demo sweep (`POST /api/demo/sweep`) runs these functions end-to-end against 
 - [`OAUTH_CREDENTIALS_SETUP.md`](./OAUTH_CREDENTIALS_SETUP.md) — registering Google, Slack, and HubSpot credentials
 - [`stitch_dynamic_interface_studio/`](./stitch_dynamic_interface_studio/) — design system (`gravity/DESIGN.md`) and HTML prototypes
 - [`hubspot-app/callforge/`](./hubspot-app/callforge/) — the CallForge HubSpot marketplace app
+- [`agent.json`](./agent.json) + [`activepieces/`](./activepieces/) — the same build spec as an ActivePieces flow export, for platforms that want a flow/agent file instead of a web app (see [`activepieces/README.md`](./activepieces/README.md))
