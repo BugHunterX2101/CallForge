@@ -59,7 +59,7 @@
           "valid": true,
           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
           "settings": {
-            "pieceName": "@activepieces/piece-googleDrive",
+            "pieceName": "@activepieces/piece-google-drive",
             "pieceVersion": "0.8.3",
             "actionName": "drive_list_files",
             "propertySettings": {},
@@ -124,7 +124,7 @@
                   "valid": true,
                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                   "settings": {
-                    "pieceName": "@activepieces/piece-googleSheets",
+                    "pieceName": "@activepieces/piece-google-sheets",
                     "pieceVersion": "0.16.7",
                     "actionName": "sheets_find_rows",
                     "propertySettings": {},
@@ -251,7 +251,7 @@
                                   "valid": true,
                                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                   "settings": {
-                                    "pieceName": "@activepieces/piece-googleSheets",
+                                    "pieceName": "@activepieces/piece-google-sheets",
                                     "pieceVersion": "0.16.7",
                                     "actionName": "sheets_add_row",
                                     "propertySettings": {},
@@ -344,7 +344,7 @@
                                         "valid": true,
                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                         "settings": {
-                                          "pieceName": "@activepieces/piece-googleSheets",
+                                          "pieceName": "@activepieces/piece-google-sheets",
                                           "pieceVersion": "0.16.7",
                                           "actionName": "sheets_add_row",
                                           "propertySettings": {},
@@ -373,7 +373,7 @@
                                         "valid": true,
                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                         "settings": {
-                                          "pieceName": "@activepieces/piece-googleSheets",
+                                          "pieceName": "@activepieces/piece-google-sheets",
                                           "pieceVersion": "0.16.7",
                                           "actionName": "sheets_find_rows",
                                           "propertySettings": {},
@@ -453,7 +453,7 @@
                                                   "valid": true,
                                                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                   "settings": {
-                                                    "pieceName": "@activepieces/piece-googleSheets",
+                                                    "pieceName": "@activepieces/piece-google-sheets",
                                                     "pieceVersion": "0.16.7",
                                                     "actionName": "sheets_add_row",
                                                     "propertySettings": {},
@@ -609,7 +609,7 @@
                                                                     "valid": true,
                                                                     "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                     "settings": {
-                                                                      "pieceName": "@activepieces/piece-googleSheets",
+                                                                      "pieceName": "@activepieces/piece-google-sheets",
                                                                       "pieceVersion": "0.16.7",
                                                                       "actionName": "sheets_add_row",
                                                                       "propertySettings": {},
@@ -639,7 +639,7 @@
                                                                   "valid": true,
                                                                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                   "settings": {
-                                                                    "pieceName": "@activepieces/piece-googleSheets",
+                                                                    "pieceName": "@activepieces/piece-google-sheets",
                                                                     "pieceVersion": "0.16.7",
                                                                     "actionName": "sheets_add_row",
                                                                     "propertySettings": {},
@@ -675,7 +675,7 @@
                                                       "valid": true,
                                                       "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                       "settings": {
-                                                        "pieceName": "@activepieces/piece-googleSheets",
+                                                        "pieceName": "@activepieces/piece-google-sheets",
                                                         "pieceVersion": "0.16.7",
                                                         "actionName": "sheets_add_row",
                                                         "propertySettings": {},
@@ -777,7 +777,7 @@
                                                         "valid": true,
                                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                         "settings": {
-                                                          "pieceName": "@activepieces/piece-googleSheets",
+                                                          "pieceName": "@activepieces/piece-google-sheets",
                                                           "pieceVersion": "0.16.7",
                                                           "actionName": "sheets_add_row",
                                                           "propertySettings": {},
@@ -822,7 +822,7 @@
                                                             "valid": true,
                                                             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                             "settings": {
-                                                              "pieceName": "@activepieces/piece-googleSheets",
+                                                              "pieceName": "@activepieces/piece-google-sheets",
                                                               "pieceVersion": "0.16.7",
                                                               "actionName": "sheets_add_row",
                                                               "propertySettings": {},
@@ -978,7 +978,7 @@
                                                                               "valid": true,
                                                                               "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                               "settings": {
-                                                                                "pieceName": "@activepieces/piece-googleSheets",
+                                                                                "pieceName": "@activepieces/piece-google-sheets",
                                                                                 "pieceVersion": "0.16.7",
                                                                                 "actionName": "sheets_add_row",
                                                                                 "propertySettings": {},
@@ -1008,7 +1008,7 @@
                                                                             "valid": true,
                                                                             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                             "settings": {
-                                                                              "pieceName": "@activepieces/piece-googleSheets",
+                                                                              "pieceName": "@activepieces/piece-google-sheets",
                                                                               "pieceVersion": "0.16.7",
                                                                               "actionName": "sheets_add_row",
                                                                               "propertySettings": {},
@@ -1044,7 +1044,7 @@
                                                                 "valid": true,
                                                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                 "settings": {
-                                                                  "pieceName": "@activepieces/piece-googleSheets",
+                                                                  "pieceName": "@activepieces/piece-google-sheets",
                                                                   "pieceVersion": "0.16.7",
                                                                   "actionName": "sheets_add_row",
                                                                   "propertySettings": {},
@@ -1094,7 +1094,7 @@
                                                         "valid": true,
                                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                         "settings": {
-                                                          "pieceName": "@activepieces/piece-googleSheets",
+                                                          "pieceName": "@activepieces/piece-google-sheets",
                                                           "pieceVersion": "0.16.7",
                                                           "actionName": "sheets_add_row",
                                                           "propertySettings": {},
@@ -1250,7 +1250,7 @@
                                                                           "valid": true,
                                                                           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                           "settings": {
-                                                                            "pieceName": "@activepieces/piece-googleSheets",
+                                                                            "pieceName": "@activepieces/piece-google-sheets",
                                                                             "pieceVersion": "0.16.7",
                                                                             "actionName": "sheets_add_row",
                                                                             "propertySettings": {},
@@ -1280,7 +1280,7 @@
                                                                         "valid": true,
                                                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                         "settings": {
-                                                                          "pieceName": "@activepieces/piece-googleSheets",
+                                                                          "pieceName": "@activepieces/piece-google-sheets",
                                                                           "pieceVersion": "0.16.7",
                                                                           "actionName": "sheets_add_row",
                                                                           "propertySettings": {},
@@ -1316,7 +1316,7 @@
                                                             "valid": true,
                                                             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                             "settings": {
-                                                              "pieceName": "@activepieces/piece-googleSheets",
+                                                              "pieceName": "@activepieces/piece-google-sheets",
                                                               "pieceVersion": "0.16.7",
                                                               "actionName": "sheets_add_row",
                                                               "propertySettings": {},

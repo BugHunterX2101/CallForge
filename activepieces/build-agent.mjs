@@ -38,8 +38,8 @@ const TS = '2026-08-12T00:00:00.000Z'
 const PIECES = {
   schedule: '0.1.21',
   gmail: '0.12.10',
-  googleDrive: '0.8.3',
-  googleSheets: '0.16.7',
+  'google-drive': '0.8.3',
+  'google-sheets': '0.16.7',
   slack: '0.17.8',
   // Built-in AI piece — no direct OpenAI connection needed; the platform
   // routes provider/model through its configured AI providers.
@@ -390,7 +390,7 @@ function findRows(name, displayName, sheetId, column, searchValue, exact, limit 
   return pieceAction({
     name,
     displayName,
-    piece: 'googleSheets',
+    piece: 'google-sheets',
     actionName: 'sheets_find_rows',
     input: {
       ...SHEET_AUTH,
@@ -408,7 +408,7 @@ function addRow(name, displayName, sheetId, values) {
   return pieceAction({
     name,
     displayName,
-    piece: 'googleSheets',
+    piece: 'google-sheets',
     actionName: 'sheets_add_row',
     input: {
       ...SHEET_AUTH,
@@ -627,7 +627,7 @@ function buildFlow() {
   const listDrive = pieceAction({
     name: 'list_drive',
     displayName: 'List transcript folder (Drive)',
-    piece: 'googleDrive',
+    piece: 'google-drive',
     actionName: 'drive_list_files',
     input: {
       auth: '{{connections.googleDrive}}',
@@ -919,6 +919,11 @@ writeFileSync(outPath, JSON.stringify(flow, null, 2) + '\n', 'utf8')
 // in @activepieces/shared — the same container ActivePieces' own template
 // export endpoint produces: { name, type, summary, description, tags, blogUrl,
 // metadata, author, categories, pieces, flows, status }).
+// FlowVersionTemplate omits the DB-backed FlowVersion fields (id, flowId,
+// state, connectionIds, agentIds, created, updated, notes, ...). Emitting
+// exactly the template shape avoids surprises for servers that read fields
+// directly instead of going through zod.
+const { id: _id, flowId: _flowId, state: _state, connectionIds: _cids, agentIds: _aids, created: _created, updated: _updated, notes: _notes, ...templateFlow } = flow
 const template = {
   name: FLOW_DISPLAY_NAME,
   type: 'SHARED',
@@ -930,7 +935,7 @@ const template = {
   author: '',
   categories: [],
   pieces: Object.values(PIECES_PIECE_NAMES),
-  flows: [flow],
+  flows: [templateFlow],
   status: 'PUBLISHED',
 }
 const flowsPath = join(ROOT, 'flows.json')
