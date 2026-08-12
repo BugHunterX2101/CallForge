@@ -136,7 +136,31 @@
                 "executionType": "EXECUTE_FIRST_MATCH"
               },
               "children": [
-                null,
+                {
+                  "type": "CODE",
+                  "name": "run_summary_none",
+                  "displayName": "Run summary",
+                  "valid": true,
+                  "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                  "settings": {
+                    "sourceCode": {
+                      "packageJson": "{}",
+                      "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                    },
+                    "input": {
+                      "outcome": "no-candidate-found",
+                      "candidate": "{{pick_candidate.output.candidate}}",
+                      "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                      "extraction": "{{parse_extraction.output}}"
+                    },
+                    "errorHandlingOptions": {
+                      "continueOnFailure": {
+                        "value": true
+                      }
+                    }
+                  },
+                  "nextAction": null
+                },
                 {
                   "type": "PIECE",
                   "name": "check_processed",
@@ -212,7 +236,31 @@
                         "executionType": "EXECUTE_FIRST_MATCH"
                       },
                       "children": [
-                        null,
+                        {
+                          "type": "CODE",
+                          "name": "run_summary_dup",
+                          "displayName": "Run summary",
+                          "valid": true,
+                          "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                          "settings": {
+                            "sourceCode": {
+                              "packageJson": "{}",
+                              "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                            },
+                            "input": {
+                              "outcome": "already-processed",
+                              "candidate": "{{pick_candidate.output.candidate}}",
+                              "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                              "extraction": "{{parse_extraction.output}}"
+                            },
+                            "errorHandlingOptions": {
+                              "continueOnFailure": {
+                                "value": true
+                              }
+                            }
+                          },
+                          "nextAction": null
+                        },
                         {
                           "type": "CODE",
                           "name": "readability_check",
@@ -316,7 +364,31 @@
                                       }
                                     }
                                   },
-                                  "nextAction": null
+                                  "nextAction": {
+                                    "type": "CODE",
+                                    "name": "run_summary_unreadable",
+                                    "displayName": "Run summary",
+                                    "valid": true,
+                                    "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                    "settings": {
+                                      "sourceCode": {
+                                        "packageJson": "{}",
+                                        "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                                      },
+                                      "input": {
+                                        "outcome": "unreadable",
+                                        "candidate": "{{pick_candidate.output.candidate}}",
+                                        "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                                        "extraction": "{{parse_extraction.output}}"
+                                      },
+                                      "errorHandlingOptions": {
+                                        "continueOnFailure": {
+                                          "value": true
+                                        }
+                                      }
+                                    },
+                                    "nextAction": null
+                                  }
                                 }
                               },
                               {
@@ -425,7 +497,31 @@
                                             }
                                           }
                                         },
-                                        "nextAction": null
+                                        "nextAction": {
+                                          "type": "CODE",
+                                          "name": "run_summary_internal",
+                                          "displayName": "Run summary",
+                                          "valid": true,
+                                          "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                          "settings": {
+                                            "sourceCode": {
+                                              "packageJson": "{}",
+                                              "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                                            },
+                                            "input": {
+                                              "outcome": "skipped-internal",
+                                              "candidate": "{{pick_candidate.output.candidate}}",
+                                              "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                                              "extraction": "{{parse_extraction.output}}"
+                                            },
+                                            "errorHandlingOptions": {
+                                              "continueOnFailure": {
+                                                "value": true
+                                              }
+                                            }
+                                          },
+                                          "nextAction": null
+                                        }
                                       },
                                       {
                                         "type": "PIECE",
@@ -742,7 +838,32 @@
                                                                         }
                                                                       }
                                                                     },
-                                                                    "nextAction": null
+                                                                    "nextAction": {
+                                                                      "type": "CODE",
+                                                                      "name": "run_summary_approved_match",
+                                                                      "displayName": "Run summary",
+                                                                      "valid": true,
+                                                                      "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                      "settings": {
+                                                                        "sourceCode": {
+                                                                          "packageJson": "{}",
+                                                                          "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                                                                        },
+                                                                        "input": {
+                                                                          "outcome": "approved",
+                                                                          "candidate": "{{pick_candidate.output.candidate}}",
+                                                                          "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                                                                          "extraction": "{{parse_extraction.output}}",
+                                                                          "draft": "{{parse_draft_match.output}}"
+                                                                        },
+                                                                        "errorHandlingOptions": {
+                                                                          "continueOnFailure": {
+                                                                            "value": true
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "nextAction": null
+                                                                    }
                                                                   }
                                                                 },
                                                                 {
@@ -777,7 +898,32 @@
                                                                       }
                                                                     }
                                                                   },
-                                                                  "nextAction": null
+                                                                  "nextAction": {
+                                                                    "type": "CODE",
+                                                                    "name": "run_summary_rejected_match",
+                                                                    "displayName": "Run summary",
+                                                                    "valid": true,
+                                                                    "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                    "settings": {
+                                                                      "sourceCode": {
+                                                                        "packageJson": "{}",
+                                                                        "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                                                                      },
+                                                                      "input": {
+                                                                        "outcome": "rejected",
+                                                                        "candidate": "{{pick_candidate.output.candidate}}",
+                                                                        "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                                                                        "extraction": "{{parse_extraction.output}}",
+                                                                        "draft": "{{parse_draft_match.output}}"
+                                                                      },
+                                                                      "errorHandlingOptions": {
+                                                                        "continueOnFailure": {
+                                                                          "value": true
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "nextAction": null
+                                                                  }
                                                                 }
                                                               ],
                                                               "nextAction": null
@@ -1178,7 +1324,32 @@
                                                                                   }
                                                                                 }
                                                                               },
-                                                                              "nextAction": null
+                                                                              "nextAction": {
+                                                                                "type": "CODE",
+                                                                                "name": "run_summary_approved_create",
+                                                                                "displayName": "Run summary",
+                                                                                "valid": true,
+                                                                                "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                                "settings": {
+                                                                                  "sourceCode": {
+                                                                                    "packageJson": "{}",
+                                                                                    "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                                                                                  },
+                                                                                  "input": {
+                                                                                    "outcome": "approved",
+                                                                                    "candidate": "{{pick_candidate.output.candidate}}",
+                                                                                    "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                                                                                    "extraction": "{{parse_extraction.output}}",
+                                                                                    "draft": "{{parse_draft_create.output}}"
+                                                                                  },
+                                                                                  "errorHandlingOptions": {
+                                                                                    "continueOnFailure": {
+                                                                                      "value": true
+                                                                                    }
+                                                                                  }
+                                                                                },
+                                                                                "nextAction": null
+                                                                              }
                                                                             }
                                                                           },
                                                                           {
@@ -1213,7 +1384,32 @@
                                                                                 }
                                                                               }
                                                                             },
-                                                                            "nextAction": null
+                                                                            "nextAction": {
+                                                                              "type": "CODE",
+                                                                              "name": "run_summary_rejected_create",
+                                                                              "displayName": "Run summary",
+                                                                              "valid": true,
+                                                                              "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                              "settings": {
+                                                                                "sourceCode": {
+                                                                                  "packageJson": "{}",
+                                                                                  "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                                                                                },
+                                                                                "input": {
+                                                                                  "outcome": "rejected",
+                                                                                  "candidate": "{{pick_candidate.output.candidate}}",
+                                                                                  "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                                                                                  "extraction": "{{parse_extraction.output}}",
+                                                                                  "draft": "{{parse_draft_create.output}}"
+                                                                                },
+                                                                                "errorHandlingOptions": {
+                                                                                  "continueOnFailure": {
+                                                                                    "value": true
+                                                                                  }
+                                                                                }
+                                                                              },
+                                                                              "nextAction": null
+                                                                            }
                                                                           }
                                                                         ],
                                                                         "nextAction": null
@@ -1502,7 +1698,32 @@
                                                                               }
                                                                             }
                                                                           },
-                                                                          "nextAction": null
+                                                                          "nextAction": {
+                                                                            "type": "CODE",
+                                                                            "name": "run_summary_approved_skip",
+                                                                            "displayName": "Run summary",
+                                                                            "valid": true,
+                                                                            "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                            "settings": {
+                                                                              "sourceCode": {
+                                                                                "packageJson": "{}",
+                                                                                "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                                                                              },
+                                                                              "input": {
+                                                                                "outcome": "approved",
+                                                                                "candidate": "{{pick_candidate.output.candidate}}",
+                                                                                "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                                                                                "extraction": "{{parse_extraction.output}}",
+                                                                                "draft": "{{parse_draft_skip.output}}"
+                                                                              },
+                                                                              "errorHandlingOptions": {
+                                                                                "continueOnFailure": {
+                                                                                  "value": true
+                                                                                }
+                                                                              }
+                                                                            },
+                                                                            "nextAction": null
+                                                                          }
                                                                         }
                                                                       },
                                                                       {
@@ -1537,7 +1758,32 @@
                                                                             }
                                                                           }
                                                                         },
-                                                                        "nextAction": null
+                                                                        "nextAction": {
+                                                                          "type": "CODE",
+                                                                          "name": "run_summary_rejected_skip",
+                                                                          "displayName": "Run summary",
+                                                                          "valid": true,
+                                                                          "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                          "settings": {
+                                                                            "sourceCode": {
+                                                                              "packageJson": "{}",
+                                                                              "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                                                                            },
+                                                                            "input": {
+                                                                              "outcome": "rejected",
+                                                                              "candidate": "{{pick_candidate.output.candidate}}",
+                                                                              "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                                                                              "extraction": "{{parse_extraction.output}}",
+                                                                              "draft": "{{parse_draft_skip.output}}"
+                                                                            },
+                                                                            "errorHandlingOptions": {
+                                                                              "continueOnFailure": {
+                                                                                "value": true
+                                                                              }
+                                                                            }
+                                                                          },
+                                                                          "nextAction": null
+                                                                        }
                                                                       }
                                                                     ],
                                                                     "nextAction": null

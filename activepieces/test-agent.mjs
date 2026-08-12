@@ -140,5 +140,20 @@ const bareDraft = await run(byName('parse_draft_match'), {
 assert(bareDraft.emailSubject.includes('Acme') && bareDraft.emailBody.includes('nina'), 'parse_draft synthesizes a grounded follow-up when AI is absent')
 assert(bareDraft.emailBody.includes('recap') && bareDraft.emailBody.length > 100, 'parse_draft fallback draft is a complete, usable email')
 
+// --- run_summary: terminal output on every path ---
+const bareSummary = await run(byName('run_summary_rejected_skip'), { outcome: 'rejected', candidate: {}, fingerprint: '', extraction: {}, draft: {} })
+assert(bareSummary.status === 'completed' && bareSummary.outcome === 'rejected', 'run_summary completes with the given outcome')
+assert(bareSummary.warnings.length === 3 && bareSummary.followupDraft.emailSubject === '', 'run_summary reports empty sections as warnings instead of failing')
+const fullSummary = await run(byName('run_summary_rejected_skip'), {
+  outcome: 'rejected',
+  candidate: pickBare.candidate,
+  fingerprint: pickBare.fingerprint,
+  extraction: bareExtract,
+  draft: bareDraft,
+})
+assert(fullSummary.candidate.subject.includes('Acme') && fullSummary.fingerprint.length > 0, 'run_summary includes the picked candidate and fingerprint')
+assert(fullSummary.extraction.externalAttendee === 'nina.k@acmecorp.com' && fullSummary.followupDraft.emailSubject.includes('Acme'), 'run_summary includes extraction + drafted follow-up')
+assert(fullSummary.warnings.length === 0, 'run_summary has no warnings on a complete run')
+
 console.log(failures === 0 ? '\nALL CODE-STEP BEHAVIOR CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)

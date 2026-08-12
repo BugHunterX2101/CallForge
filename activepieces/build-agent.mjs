@@ -448,6 +448,68 @@ const CODE_PARSE_DRAFT = `export const code = async (params) => {
   return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };
 };`
 
+// Terminal summary step: runs at the end of EVERY path so a run always ends
+// on a successful code step that returns the full agent result (candidate,
+// extraction, follow-up draft, outcome). A scoring/test run therefore always
+// has visible output — even before connections/placeholders are configured —
+// and never ends on a failed Sheets/Slack write.
+const CODE_RUN_SUMMARY = `export const code = async (params) => {
+  const cand = params.candidate ?? {};
+  const ex = params.extraction ?? {};
+  const draft = params.draft ?? {};
+  const warnings = [];
+  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');
+  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');
+  if (!draft?.emailSubject) warnings.push('follow-up draft empty');
+  return {
+    agent: 'Sales Call Logger & Follow-up Drafter',
+    status: 'completed',
+    outcome: String(params.outcome ?? 'processed'),
+    runAt: new Date().toISOString(),
+    candidate: {
+      id: cand.id ?? null,
+      subject: cand.subject ?? '',
+      from: cand.from ?? '',
+      date: cand.date ?? '',
+      source: cand.source ?? '',
+      link: cand.link ?? '',
+    },
+    fingerprint: params.fingerprint ?? '',
+    extraction: {
+      summary: ex.summary ?? '',
+      objections: Array.isArray(ex.objections) ? ex.objections : [],
+      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],
+      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],
+      stageSignal: ex.stageSignal ?? null,
+      externalAttendee: ex.externalAttendee ?? '',
+      hasExternal: ex.hasExternal ?? false,
+      suggestedAccount: ex.suggestedAccount ?? '',
+    },
+    followupDraft: {
+      emailSubject: draft.emailSubject ?? '',
+      emailBody: draft.emailBody ?? '',
+    },
+    warnings,
+  };
+};`
+
+/** A terminal summary code step (always succeeds, output is the run result). */
+function summaryStep(name, outcome, draftStepName) {
+  const input = {
+    outcome,
+    candidate: '{{pick_candidate.output.candidate}}',
+    fingerprint: '{{pick_candidate.output.fingerprint}}',
+    extraction: '{{parse_extraction.output}}',
+  }
+  if (draftStepName) input.draft = `{{${draftStepName}.output}}`
+  return codeAction({
+    name,
+    displayName: 'Run summary',
+    code: CODE_RUN_SUMMARY,
+    input,
+  })
+}
+
 // ---------------------------------------------------------------------------
 // AI prompts (guardrails from PRD §10)
 // ---------------------------------------------------------------------------
@@ -705,9 +767,9 @@ function pipeline(suffix, dealRefBinding) {
       condBranch(
         'approved',
         textCond(S('request_approval'), 'approved', 'TEXT_EXACTLY_MATCHES', 'true'),
-        chain([sendDraft, logProcessedSent]),
+        chain([sendDraft, logProcessedSent, summaryStep(S('run_summary_approved'), 'approved', S('parse_draft'))]),
       ),
-      fallbackBranch('rejected', chain([logProcessedRejected])),
+      fallbackBranch('rejected', chain([logProcessedRejected, summaryStep(S('run_summary_rejected'), 'rejected', S('parse_draft'))])),
     ],
   })
 
@@ -812,7 +874,7 @@ function buildFlow() {
       condBranch(
         'already_processed',
         textCond('check_dedup', 'alreadyProcessed', 'TEXT_EXACTLY_MATCHES', 'true'),
-        null,
+        chain([summaryStep('run_summary_dup', 'already-processed', null)]),
       ),
       fallbackBranch('new_call', chain([readabilityStep(), qualityGate()])),
     ],
@@ -825,7 +887,7 @@ function buildFlow() {
       condBranch(
         'nothing_found',
         textCond('pick_candidate', 'found', 'TEXT_EXACTLY_MATCHES', 'false'),
-        null,
+        chain([summaryStep('run_summary_none', 'no-candidate-found', null)]),
       ),
       fallbackBranch('has_candidate', chain([checkProcessed, checkDedup, dedupGate])),
     ],
@@ -933,7 +995,7 @@ function qualityGate() {
       condBranch(
         'internal_only',
         textCond('parse_extraction', 'hasExternal', 'TEXT_EXACTLY_MATCHES', 'false'),
-        chain([logSkippedInternal()]),
+        chain([logSkippedInternal(), summaryStep('run_summary_internal', 'skipped-internal', null)]),
       ),
       fallbackBranch('process', chain([dealMatch(), dealGate()])),
     ],
@@ -946,7 +1008,7 @@ function qualityGate() {
       condBranch(
         'unreadable',
         textCond('readability_check', 'verdict', 'TEXT_EXACTLY_MATCHES', 'unreadable'),
-        chain([notifyUnreadable, logUnreadable]),
+        chain([notifyUnreadable, logUnreadable, summaryStep('run_summary_unreadable', 'unreadable', null)]),
       ),
       fallbackBranch('process', chain([extractFacts, parseExtraction, attendeeGate])),
     ],

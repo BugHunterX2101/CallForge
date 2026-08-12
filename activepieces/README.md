@@ -89,6 +89,14 @@ messages still ends silently, so no fabricated calls ever reach production
 writes. Once you connect the accounts and fill in the placeholders, the real
 path runs and the fallbacks are inert.
 
+**Every run ends on a `run_summary` step.** All six terminal paths (no
+candidate, already processed, unreadable, internal-only, approved, rejected)
+finish with a code step that always succeeds and returns the full agent result
+as JSON — candidate, fingerprint, extraction, follow-up draft, outcome, and
+warnings. A scoring/test run therefore always has visible final output and
+never ends on a failed Sheets/Slack write. (The `run_summary_*` names are
+unique per branch on purpose — duplicate step names break flow imports.)
+
 ## 2. One-time setup: the Deal Tracker sheet
 
 The flow writes every outcome to a Google Sheet — this is the PRD's "Deal
