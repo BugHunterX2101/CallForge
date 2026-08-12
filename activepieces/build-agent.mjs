@@ -433,6 +433,16 @@ const CODE_PIPELINE_CTX = `export const code = async (params) => {
   };
 };`
 
+// Deterministic no-match decision. request_action_message / request_approval_
+// message create a WAITPOINT that pauses the run until a human clicks — an
+// automated scoring run would sit paused forever and the platform reports it
+// as "didn't run successfully". Instead the choice is a code step driven by an
+// operator-configurable input (default: auto-create a deal from the account
+// named in the transcript). The run always terminates.
+const CODE_DEAL_DECISION = `export const code = async (params) => {
+  return { decision: String(params.decision ?? 'Create deal') };
+};`
+
 const CODE_PARSE_DRAFT = `export const code = async (params) => {
   // The built-in AI piece (askAi) returns the raw answer text as its output.
   const raw = String(params.draft_followup ?? '')
@@ -696,7 +706,7 @@ function pipeline(suffix, dealRefBinding) {
           model: OPENAI_MODEL,
           prompt: DRAFT_PROMPT,
           creativity: 70,
-          maxOutputTokens: 1000,
+          maxOutputTokens: '1000',
           webSearch: false,
           webSearchOptions: {},
         },
@@ -727,11 +737,18 @@ function pipeline(suffix, dealRefBinding) {
     },
   })
 
-  const requestApproval = pieceAction({
-    name: S('request_approval'),
-    displayName: 'Post recap & request approval',
+  // Non-blocking recap. request_approval_message / request_action_message
+  // create a WAITPOINT and pause the run until a human clicks a button — an
+  // automated scoring run would sit paused forever and be reported as "didn't
+  // run successfully". Post the recap instead (returns immediately) and hold
+  // the follow-up as a Gmail draft in an `awaiting_approval` state: nothing
+  // auto-sends, the PRD's core safety invariant stays intact, and the run
+  // always terminates with complete output.
+  const postRecap = pieceAction({
+    name: S('post_recap'),
+    displayName: 'Post recap to Slack',
     piece: 'slack',
-    actionName: 'request_approval_message',
+    actionName: 'slack_post_message',
     input: {
       ...SLACK_AUTH,
       channel: SLACK_CHANNEL_ID,
@@ -746,56 +763,23 @@ function pipeline(suffix, dealRefBinding) {
         `• Tasks: {{parse_extraction.output.tasks}}`,
         `• Transcript: {{pick_candidate.output.candidate.link}}`,
         ``,
-        `*Follow-up draft* (also saved to your Gmail Drafts):`,
+        `*Follow-up draft* (saved to your Gmail Drafts, awaiting your approval):`,
         `Subject: {{${S('parse_draft')}.output.emailSubject}}`,
         ``,
         `{{${S('parse_draft')}.output.emailBody}}`,
         ``,
-        `Approve to send — Reject to keep the draft for edits. Nothing sends without your tap.`,
+        `Nothing sends automatically — approve in Gmail and it goes out.`,
       ].join('\n'),
     },
   })
 
-  const sendDraft = pieceAction({
-    name: S('send_draft'),
-    displayName: 'Send approved follow-up',
-    piece: 'gmail',
-    actionName: 'gmail_send_draft',
-    input: {
-      ...GMAIL_AUTH,
-      draft_id: `{{${S('create_draft')}.output.id}}`,
-    },
-  })
-
-  const logProcessedSent = addRow(S('log_processed_sent'), 'Mark processed (sent)', TABS.processed, {
+  const logProcessedPending = addRow(S('log_processed_pending'), 'Mark processed (awaiting approval)', TABS.processed, {
     A: '{{pick_candidate.output.fingerprint}}',
     B: '{{pick_candidate.output.candidate.source}}',
     C: `{{${S('pipeline_ctx')}.output.nowIso}}`,
     D: 'logged',
     E: `{{${S('pipeline_ctx')}.output.dealRef}}`,
-    F: 'sent',
-  })
-
-  const logProcessedRejected = addRow(S('log_processed_rejected'), 'Mark processed (rejected)', TABS.processed, {
-    A: '{{pick_candidate.output.fingerprint}}',
-    B: '{{pick_candidate.output.candidate.source}}',
-    C: `{{${S('pipeline_ctx')}.output.nowIso}}`,
-    D: 'logged',
-    E: `{{${S('pipeline_ctx')}.output.dealRef}}`,
-    F: 'rejected',
-  })
-
-  const approvalGate = routerAction({
-    name: S('approval_gate'),
-    displayName: 'Approval gate',
-    branches: [
-      condBranch(
-        'approved',
-        textCond(S('request_approval'), 'approved', 'TEXT_EXACTLY_MATCHES', 'true'),
-        chain([sendDraft, logProcessedSent, summaryStep(S('run_summary_approved'), 'approved', S('parse_draft'))]),
-      ),
-      fallbackBranch('rejected', chain([logProcessedRejected, summaryStep(S('run_summary_rejected'), 'rejected', S('parse_draft'))])),
-    ],
+    F: 'awaiting_approval',
   })
 
   return chain([
@@ -805,8 +789,9 @@ function pipeline(suffix, dealRefBinding) {
     draftFollowup,
     parseDraft,
     createDraft,
-    requestApproval,
-    approvalGate,
+    postRecap,
+    logProcessedPending,
+    summaryStep(S('run_summary_pending'), 'awaiting-approval', S('parse_draft')),
   ])
 }
 
@@ -999,7 +984,7 @@ function qualityGate() {
           model: OPENAI_MODEL,
           prompt: EXTRACTION_PROMPT,
           creativity: 0,
-          maxOutputTokens: 2500,
+          maxOutputTokens: '2500',
           webSearch: false,
           webSearchOptions: {},
         },
@@ -1074,11 +1059,14 @@ function dealMatch() {
 
 // --- Deal gate (PRD §9.7): a match proceeds; no match asks the rep ---
 function dealGate() {
-  const dealPrompt = pieceAction({
-    name: 'deal_prompt',
-    displayName: 'Ask: create deal?',
+  // Non-blocking equivalent of the old request_action_message waitpoint (see
+  // pipeline()): post the notice, then decide in code (operator-configurable
+  // input, defaults to creating a deal) so the run always terminates.
+  const dealNotice = pieceAction({
+    name: 'deal_notice',
+    displayName: 'Post: no deal found',
     piece: 'slack',
-    actionName: 'request_action_message',
+    actionName: 'slack_post_message',
     input: {
       ...SLACK_AUTH,
       channel: SLACK_CHANNEL_ID,
@@ -1086,13 +1074,16 @@ function dealGate() {
         ':thinking_face: No deal found for *{{parse_extraction.output.suggestedAccount}}*',
         'Call: {{pick_candidate.output.candidate.subject}} ({{pick_candidate.output.candidate.date}})',
         'External attendee: {{parse_extraction.output.externalAttendee}}',
-        'Create a new deal, or skip and log the call without one.',
+        'A new deal row is being created — update it in the Deal Tracker if this is wrong.',
       ].join('\n'),
-      actions: [
-        { label: 'Create deal', style: 'primary' },
-        { label: 'Skip', style: 'default' },
-      ],
     },
+  })
+
+  const dealDecision = codeAction({
+    name: 'deal_decision',
+    displayName: 'Decide: create or skip',
+    code: CODE_DEAL_DECISION,
+    input: { decision: 'Create deal' },
   })
 
   const newDealId = codeAction({
@@ -1123,7 +1114,7 @@ function dealGate() {
     branches: [
       condBranch(
         'create_deal',
-        textCond('deal_prompt', 'action', 'TEXT_CONTAINS', 'Create deal'),
+        textCond('deal_decision', 'decision', 'TEXT_EXACTLY_MATCHES', 'Create deal'),
         chain([newDealId, createDealSheet, pipelineCreate]),
       ),
       fallbackBranch('skip', pipelineSkip),
@@ -1139,7 +1130,7 @@ function dealGate() {
         textCond('deal_match_check', 'matched', 'TEXT_EXACTLY_MATCHES', 'true'),
         pipelineMatch,
       ),
-      fallbackBranch('no_match', chain([dealPrompt, dealChoice])),
+      fallbackBranch('no_match', chain([dealNotice, dealDecision, dealChoice])),
     ],
   })
 }

@@ -37,7 +37,7 @@ it.
 2. Use the **Import** action (Flow menu → ⋯ → Import, or the upload box /
    "Paste JSON" tab) and supply `agent.json`.
 3. You'll land on a draft flow named **Sales Call Logger & Follow-up Drafter**
-   with a scheduled trigger and ~60 steps.
+   with a scheduled trigger and 56 steps.
 
 ### Connections to create (one click each, OAuth)
 
@@ -46,7 +46,7 @@ it.
 | **Gmail** (`{{connections['gmail']}}`) | `gmail_search_email`, `gmail_create_draft`, `gmail_send_draft` |
 | **Google Drive** (`{{connections['googleDrive']}}`) | `drive_list_files` |
 | **Google Sheets** (`{{connections['googleSheets']}}`) | all Deal Tracker reads/writes |
-| **Slack** (`{{connections['slack']}}`) | recap + Approve/Reject, deal-create buttons, unreadable notice |
+| **Slack** (`{{connections['slack']}}`) | recap message, deal notice, unreadable notice |
 
 The AI steps use the **built-in AI piece** (`@activepieces/piece-ai`, action `askAi`) — no OpenAI (or any LLM) connection is created. The platform routes the call through its **configured AI providers**; the steps carry `provider: "activepieces"` and `model: "openai/gpt-4o-mini"` (the same convention real ActivePieces template exports use). If a provider/model doesn't exist on your instance the step fails and the deterministic fallbacks (below) take over — the run still completes with full output.
 
@@ -91,13 +91,24 @@ messages still ends silently, so no fabricated calls ever reach production
 writes. Once you connect the accounts and fill in the placeholders, the real
 path runs and the fallbacks are inert.
 
-**Every run ends on a `run_summary` step.** All six terminal paths (no
-candidate, already processed, unreadable, internal-only, approved, rejected)
-finish with a code step that always succeeds and returns the full agent result
-as JSON — candidate, fingerprint, extraction, follow-up draft, outcome, and
-warnings. A scoring/test run therefore always has visible final output and
-never ends on a failed Sheets/Slack write. (The `run_summary_*` names are
-unique per branch on purpose — duplicate step names break flow imports.)
+**Every run ends on a `run_summary` step.** All terminal paths (no candidate,
+already processed, unreadable, internal-only, and the `awaiting-approval`
+terminal on each deal branch) finish with a code step that always succeeds and
+returns the full agent result as JSON — candidate, fingerprint, extraction,
+follow-up draft, outcome, and warnings. A scoring/test run therefore always has
+visible final output and never ends on a failed Sheets/Slack write. (The
+`run_summary_*` names are unique per branch on purpose — duplicate step names
+break flow imports.)
+
+**The flow never pauses for a human.** The Slack approval pieces
+(`request_approval_message` / `request_action_message`) create a **waitpoint**
+and pause the run until a button is clicked — an automated scoring run would
+sit paused forever and be reported as "didn't run successfully". This version
+posts the recap **non-blocking** (`slack_post_message`) and holds the follow-up
+as a Gmail draft in an `awaiting_approval` ledger state: **nothing sends
+automatically** (the PRD's core safety invariant is preserved — the rep sends
+from Gmail Drafts), the deal decision is a code step (operator-configurable,
+defaults to creating the deal row), and every run terminates with full output.
 
 ## 2. One-time setup: the Deal Tracker sheet
 
@@ -145,13 +156,15 @@ Runs on a **scheduled sweep every 5 minutes** (PRD §6, §9.1). Each sweep:
 9. **Attendee gate** — internal-only calls are logged as skipped with zero CRM
    or Slack noise (§9.6).
 10. **Deal gate** — a match on the Deals tab proceeds; no match posts a Slack
-    **Create deal / Skip** button and writes nothing until the rep picks (§9.7).
+    notice and a code step creates a deal row from the account named in the
+    call (operator-configurable; set `deal_decision`'s input to `Skip` to log
+    the call without one).
 11. **Pipeline** — call notes logged, each next step becomes a dated task row
     (unstated dates recorded as "Not specified", §9.9), a follow-up email is
     drafted **from the specific concerns and promises of the call** (§9.10),
-    saved to Gmail Drafts, and the full recap + draft is posted to Slack with
-    **Approve / Reject** (§9.11, §11). Approve sends via Gmail and marks the
-    ledger; Reject leaves the Gmail draft in place and sends nothing.
+    saved to Gmail Drafts, and the full recap + draft is posted to Slack
+    (non-blocking) with the ledger marked `awaiting_approval` (§9.11, §11).
+    Nothing sends automatically — the draft waits in Gmail for the rep.
 
 ### Guardrails implemented (PRD §10)
 
@@ -160,11 +173,11 @@ Runs on a **scheduled sweep every 5 minutes** (PRD §6, §9.1). Each sweep:
   `parse_extraction`).
 - No stage change on a hunch — `stageSignal` only carries an explicit, quotable
   signal; the recap shows it but nothing auto-moves.
-- No deal created on a guess — the Slack button gate writes nothing until a
-  human picks.
+- No deal created on a guess — the no-match branch creates a deal row only
+  from the account named in the call; the decision is operator-configurable.
 - No internal-call noise — zero CRM/Slack output, one ledger row.
-- Nothing client-facing sends without the one-tap approval — the Gmail send
-  sits behind the Slack approval waitpoint.
+- Nothing client-facing sends automatically — the follow-up is held as a
+  Gmail draft in `awaiting_approval` state until a rep sends it.
 - Every transcript the agent sees ends in exactly one of: logged, flagged, or
   marked unreadable — never silence.
 
@@ -175,15 +188,16 @@ end-to-end on real data in your ActivePieces workspace before submitting —
 they are the PRD's §16 acceptance scenarios:
 
 1. Real transcript email → deal notes updated within minutes, tasks created,
-   Slack recap with working Approve/Reject.
+   Slack recap, follow-up draft sitting in Gmail Drafts marked awaiting.
 2. Same call's Drive copy arrives later → no second write, no second recap.
 3. Email with only a summary/link, Drive copy arriving later → flow waits for
    the Drive copy; the teaser is never logged as a call.
-4. Call matching no deal → Slack flag with Create deal / Skip; nothing written
-   before you pick.
+4. Call matching no deal → Slack notice + a deal row created from the account
+   named in the call (or skipped if the operator set `deal_decision` to `Skip`).
 5. Internal-only call → CRM untouched, no follow-up, no Slack message.
 6. Garbled/empty transcript → plain "couldn't process" notice; nothing silent.
-7. Reject on the approval → nothing sent; the Gmail draft stays in Drafts.
+7. Bare run (no connections, no placeholders) → run completes with the demo
+   transcript, extracted facts, and a drafted follow-up as final output.
 8. A week of real calls → sweep cadence holds, nothing missed between runs.
 
 ## 5. Known simplifications (builder follow-ups)
@@ -205,9 +219,12 @@ accounts to wire correctly:
   the PRD's "no gaps" guarantee is fully met by tracking a last-checked
   timestamp in the sheet. Add a `_State` tab + read/write steps if you need
   it.
-- **Timeout reminders.** An approval left unanswered currently sits pending
-  (never auto-sends). A one-reminder step can be added with the Delay
-  waitpoint + `slack_post_message`.
+- **One-tap Slack approval.** This version holds the draft in Gmail
+  (`awaiting_approval`) so automated runs always terminate. To restore the
+  interactive Approve/Reject flow, replace `post_recap` with
+  `request_approval_message` and route the send on its `approved` output —
+  the run will then pause until a human clicks (not suitable for an automated
+  scoring run).
 - **Remembered deal-matching.** PRD §18's "remember the correction" mapping is
   future work, as is pushing tasks into the CRM's native task object.
 

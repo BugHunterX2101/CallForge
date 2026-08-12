@@ -127,6 +127,12 @@ assert(ctx.dealRef === 'deal_techflow' && ctx.noteId.startsWith('note_'), 'pipel
 const nd = await run(byName('new_deal_id'), {})
 assert(nd.dealId.startsWith('deal_'), 'new_deal_id generates a deal id')
 
+// --- deal_decision ---
+const dd = await run(byName('deal_decision'), {})
+assert(dd.decision === 'Create deal', 'deal_decision defaults to creating a deal (run terminates, no waitpoint)')
+const ddSkip = await run(byName('deal_decision'), { decision: 'Skip' })
+assert(ddSkip.decision === 'Skip', 'deal_decision honors an operator override')
+
 // --- parse_draft ---
 const draft = await run(byName('parse_draft_match'), {
   draft_followup: JSON.stringify({ email_subject: 'Pilot next steps', email_body: 'Hi Nina,\n\nHere is the contract.\n\nBest' }),
@@ -141,11 +147,11 @@ assert(bareDraft.emailSubject.includes('Acme') && bareDraft.emailBody.includes('
 assert(bareDraft.emailBody.includes('recap') && bareDraft.emailBody.length > 100, 'parse_draft fallback draft is a complete, usable email')
 
 // --- run_summary: terminal output on every path ---
-const bareSummary = await run(byName('run_summary_rejected_skip'), { outcome: 'rejected', candidate: {}, fingerprint: '', extraction: {}, draft: {} })
-assert(bareSummary.status === 'completed' && bareSummary.outcome === 'rejected', 'run_summary completes with the given outcome')
+const bareSummary = await run(byName('run_summary_pending_skip'), { outcome: 'awaiting-approval', candidate: {}, fingerprint: '', extraction: {}, draft: {} })
+assert(bareSummary.status === 'completed' && bareSummary.outcome === 'awaiting-approval', 'run_summary completes with the given outcome')
 assert(bareSummary.warnings.length === 3 && bareSummary.followupDraft.emailSubject === '', 'run_summary reports empty sections as warnings instead of failing')
-const fullSummary = await run(byName('run_summary_rejected_skip'), {
-  outcome: 'rejected',
+const fullSummary = await run(byName('run_summary_pending_skip'), {
+  outcome: 'awaiting-approval',
   candidate: pickBare.candidate,
   fingerprint: pickBare.fingerprint,
   extraction: bareExtract,
