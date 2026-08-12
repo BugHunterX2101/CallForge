@@ -34,17 +34,17 @@ on npm (see "Schema & versions").
 
 | Connection | Used by |
 |---|---|
-| **Gmail** (`{{connections.gmail}}`) | `gmail_search_email`, `gmail_create_draft`, `gmail_send_draft` |
-| **Google Drive** (`{{connections.googleDrive}}`) | `drive_list_files` |
-| **Google Sheets** (`{{connections.googleSheets}}`) | all Deal Tracker reads/writes |
-| **Slack** (`{{connections.slack}}`) | recap + Approve/Reject, deal-create buttons, unreadable notice |
+| **Gmail** (`{{connections['gmail']}}`) | `gmail_search_email`, `gmail_create_draft`, `gmail_send_draft` |
+| **Google Drive** (`{{connections['googleDrive']}}`) | `drive_list_files` |
+| **Google Sheets** (`{{connections['googleSheets']}}`) | all Deal Tracker reads/writes |
+| **Slack** (`{{connections['slack']}}`) | recap + Approve/Reject, deal-create buttons, unreadable notice |
 
 The AI steps use the **built-in AI piece** (`@activepieces/piece-ai`, action `askAi`) — no OpenAI (or any LLM) connection is created. The platform routes the call through its **configured AI providers**; the steps carry `provider: "openai"` and a model value, which you should set from the dropdown to one of the providers/models your instance has enabled.
 
 The auth fields reference these connection names as placeholders
-(`{{connections.gmail}}` etc.). Select the connection you created on each step
-in the builder — this is how ActivePieces templates work; connections can never
-be embedded in an export.
+(`{{connections['gmail']}}` etc. — the bracket form the builder itself uses).
+Select the connection you created on each step in the builder — this is how
+ActivePieces templates work; connections can never be embedded in an export.
 
 ### Placeholders to replace (search for `REPLACE_`)
 

@@ -384,7 +384,14 @@ Return ONLY valid JSON:
 // Sheet helpers
 // ---------------------------------------------------------------------------
 
-const SHEET_AUTH = { auth: '{{connections.googleSheets}}' }
+// Connection references must use the bracket form the ActivePieces UI and the
+// server's extractConnectionIdsFromAuth regex produce: {{connections['name']}}.
+// Dot notation ({{connections.name}}) is never matched, so the flow would
+// import with an empty connectionIds array and never resolve connections.
+const GMAIL_AUTH = { auth: "{{connections['gmail']}}" }
+const DRIVE_AUTH = { auth: "{{connections['googleDrive']}}" }
+const SHEET_AUTH = { auth: "{{connections['googleSheets']}}" }
+const SLACK_AUTH = { auth: "{{connections['slack']}}" }
 
 function findRows(name, displayName, sheetId, column, searchValue, exact, limit = 1) {
   return pieceAction({
@@ -498,7 +505,7 @@ function pipeline(suffix, dealRefBinding) {
     piece: 'gmail',
     actionName: 'gmail_create_draft',
     input: {
-      auth: '{{connections.gmail}}',
+      ...GMAIL_AUTH,
       receiver: ['{{parse_extraction.output.externalAttendee}}'],
       subject: `{{${S('parse_draft')}.output.emailSubject}}`,
       body_type: 'plain_text',
@@ -512,7 +519,7 @@ function pipeline(suffix, dealRefBinding) {
     piece: 'slack',
     actionName: 'request_approval_message',
     input: {
-      auth: '{{connections.slack}}',
+      ...SLACK_AUTH,
       channel: SLACK_CHANNEL_ID,
       text: [
         `:white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*`,
@@ -541,7 +548,7 @@ function pipeline(suffix, dealRefBinding) {
     piece: 'gmail',
     actionName: 'gmail_send_draft',
     input: {
-      auth: '{{connections.gmail}}',
+      ...GMAIL_AUTH,
       draft_id: `{{${S('create_draft')}.output.id}}`,
     },
   })
@@ -616,7 +623,7 @@ function buildFlow() {
     piece: 'gmail',
     actionName: 'gmail_search_email',
     input: {
-      auth: '{{connections.gmail}}',
+      ...GMAIL_AUTH,
       from: '',
       after_date: '{{sweep_window.output.sinceIso}}',
       max_results: 10,
@@ -630,7 +637,7 @@ function buildFlow() {
     piece: 'google-drive',
     actionName: 'drive_list_files',
     input: {
-      auth: '{{connections.googleDrive}}',
+      ...DRIVE_AUTH,
       folder_id: DRIVE_FOLDER_ID,
       include_trashed: false,
       depth_level: 1,
@@ -736,7 +743,7 @@ function qualityGate() {
     piece: 'slack',
     actionName: 'slack_post_message',
     input: {
-      auth: '{{connections.slack}}',
+      ...SLACK_AUTH,
       channel: SLACK_CHANNEL_ID,
       text: [
         ':warning: *Call transcript could not be processed*',
@@ -843,7 +850,7 @@ function dealGate() {
     piece: 'slack',
     actionName: 'request_action_message',
     input: {
-      auth: '{{connections.slack}}',
+      ...SLACK_AUTH,
       channel: SLACK_CHANNEL_ID,
       text: [
         ':thinking_face: No deal found for *{{parse_extraction.output.suggestedAccount}}*',

@@ -64,7 +64,7 @@
               "actionName": "gmail_search_email",
               "propertySettings": {},
               "input": {
-                "auth": "{{connections.gmail}}",
+                "auth": "{{connections['gmail']}}",
                 "from": "",
                 "after_date": "{{sweep_window.output.sinceIso}}",
                 "max_results": 10,
@@ -83,7 +83,7 @@
                 "actionName": "drive_list_files",
                 "propertySettings": {},
                 "input": {
-                  "auth": "{{connections.googleDrive}}",
+                  "auth": "{{connections['googleDrive']}}",
                   "folder_id": "REPLACE_WITH_TRANSCRIPT_FOLDER_ID",
                   "include_trashed": false,
                   "depth_level": 1,
@@ -148,7 +148,7 @@
                         "actionName": "sheets_find_rows",
                         "propertySettings": {},
                         "input": {
-                          "auth": "{{connections.googleSheets}}",
+                          "auth": "{{connections['googleSheets']}}",
                           "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                           "sheet_id": 4,
                           "column_name": "A",
@@ -258,7 +258,7 @@
                                       "actionName": "slack_post_message",
                                       "propertySettings": {},
                                       "input": {
-                                        "auth": "{{connections.slack}}",
+                                        "auth": "{{connections['slack']}}",
                                         "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                         "text": ":warning: *Call transcript could not be processed*\nSource: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.subject}}\nDate: {{pick_candidate.output.candidate.date}}\nThe transcript was empty or unreadable, so nothing was logged and no follow-up was drafted. Please handle this call manually:\n{{pick_candidate.output.candidate.link}}"
                                       }
@@ -275,7 +275,7 @@
                                         "actionName": "sheets_add_row",
                                         "propertySettings": {},
                                         "input": {
-                                          "auth": "{{connections.googleSheets}}",
+                                          "auth": "{{connections['googleSheets']}}",
                                           "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                           "sheet_id": 4,
                                           "first_row_headers": true,
@@ -368,7 +368,7 @@
                                               "actionName": "sheets_add_row",
                                               "propertySettings": {},
                                               "input": {
-                                                "auth": "{{connections.googleSheets}}",
+                                                "auth": "{{connections['googleSheets']}}",
                                                 "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                 "sheet_id": 4,
                                                 "first_row_headers": true,
@@ -397,7 +397,7 @@
                                               "actionName": "sheets_find_rows",
                                               "propertySettings": {},
                                               "input": {
-                                                "auth": "{{connections.googleSheets}}",
+                                                "auth": "{{connections['googleSheets']}}",
                                                 "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                 "sheet_id": 0,
                                                 "column_name": "A",
@@ -477,7 +477,7 @@
                                                         "actionName": "sheets_add_row",
                                                         "propertySettings": {},
                                                         "input": {
-                                                          "auth": "{{connections.googleSheets}}",
+                                                          "auth": "{{connections['googleSheets']}}",
                                                           "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                           "sheet_id": 2,
                                                           "first_row_headers": true,
@@ -550,7 +550,7 @@
                                                                 "actionName": "gmail_create_draft",
                                                                 "propertySettings": {},
                                                                 "input": {
-                                                                  "auth": "{{connections.gmail}}",
+                                                                  "auth": "{{connections['gmail']}}",
                                                                   "receiver": [
                                                                     "{{parse_extraction.output.externalAttendee}}"
                                                                   ],
@@ -571,7 +571,7 @@
                                                                   "actionName": "request_approval_message",
                                                                   "propertySettings": {},
                                                                   "input": {
-                                                                    "auth": "{{connections.slack}}",
+                                                                    "auth": "{{connections['slack']}}",
                                                                     "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                                     "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_match.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (also saved to your Gmail Drafts):\nSubject: {{parse_draft_match.output.emailSubject}}\n\n{{parse_draft_match.output.emailBody}}\n\nApprove to send — Reject to keep the draft for edits. Nothing sends without your tap."
                                                                   }
@@ -617,7 +617,7 @@
                                                                         "actionName": "gmail_send_draft",
                                                                         "propertySettings": {},
                                                                         "input": {
-                                                                          "auth": "{{connections.gmail}}",
+                                                                          "auth": "{{connections['gmail']}}",
                                                                           "draft_id": "{{create_draft_match.output.id}}"
                                                                         }
                                                                       },
@@ -633,7 +633,7 @@
                                                                           "actionName": "sheets_add_row",
                                                                           "propertySettings": {},
                                                                           "input": {
-                                                                            "auth": "{{connections.googleSheets}}",
+                                                                            "auth": "{{connections['googleSheets']}}",
                                                                             "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                             "sheet_id": 4,
                                                                             "first_row_headers": true,
@@ -663,7 +663,7 @@
                                                                         "actionName": "sheets_add_row",
                                                                         "propertySettings": {},
                                                                         "input": {
-                                                                          "auth": "{{connections.googleSheets}}",
+                                                                          "auth": "{{connections['googleSheets']}}",
                                                                           "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                           "sheet_id": 4,
                                                                           "first_row_headers": true,
@@ -699,7 +699,7 @@
                                                             "actionName": "sheets_add_row",
                                                             "propertySettings": {},
                                                             "input": {
-                                                              "auth": "{{connections.googleSheets}}",
+                                                              "auth": "{{connections['googleSheets']}}",
                                                               "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                               "sheet_id": 3,
                                                               "first_row_headers": true,
@@ -732,7 +732,7 @@
                                                       "actionName": "request_action_message",
                                                       "propertySettings": {},
                                                       "input": {
-                                                        "auth": "{{connections.slack}}",
+                                                        "auth": "{{connections['slack']}}",
                                                         "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                         "text": ":thinking_face: No deal found for *{{parse_extraction.output.suggestedAccount}}*\nCall: {{pick_candidate.output.candidate.subject}} ({{pick_candidate.output.candidate.date}})\nExternal attendee: {{parse_extraction.output.externalAttendee}}\nCreate a new deal, or skip and log the call without one.",
                                                         "actions": [
@@ -801,7 +801,7 @@
                                                               "actionName": "sheets_add_row",
                                                               "propertySettings": {},
                                                               "input": {
-                                                                "auth": "{{connections.googleSheets}}",
+                                                                "auth": "{{connections['googleSheets']}}",
                                                                 "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                 "sheet_id": 0,
                                                                 "first_row_headers": true,
@@ -846,7 +846,7 @@
                                                                   "actionName": "sheets_add_row",
                                                                   "propertySettings": {},
                                                                   "input": {
-                                                                    "auth": "{{connections.googleSheets}}",
+                                                                    "auth": "{{connections['googleSheets']}}",
                                                                     "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                     "sheet_id": 2,
                                                                     "first_row_headers": true,
@@ -919,7 +919,7 @@
                                                                           "actionName": "gmail_create_draft",
                                                                           "propertySettings": {},
                                                                           "input": {
-                                                                            "auth": "{{connections.gmail}}",
+                                                                            "auth": "{{connections['gmail']}}",
                                                                             "receiver": [
                                                                               "{{parse_extraction.output.externalAttendee}}"
                                                                             ],
@@ -940,7 +940,7 @@
                                                                             "actionName": "request_approval_message",
                                                                             "propertySettings": {},
                                                                             "input": {
-                                                                              "auth": "{{connections.slack}}",
+                                                                              "auth": "{{connections['slack']}}",
                                                                               "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                                               "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_create.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (also saved to your Gmail Drafts):\nSubject: {{parse_draft_create.output.emailSubject}}\n\n{{parse_draft_create.output.emailBody}}\n\nApprove to send — Reject to keep the draft for edits. Nothing sends without your tap."
                                                                             }
@@ -986,7 +986,7 @@
                                                                                   "actionName": "gmail_send_draft",
                                                                                   "propertySettings": {},
                                                                                   "input": {
-                                                                                    "auth": "{{connections.gmail}}",
+                                                                                    "auth": "{{connections['gmail']}}",
                                                                                     "draft_id": "{{create_draft_create.output.id}}"
                                                                                   }
                                                                                 },
@@ -1002,7 +1002,7 @@
                                                                                     "actionName": "sheets_add_row",
                                                                                     "propertySettings": {},
                                                                                     "input": {
-                                                                                      "auth": "{{connections.googleSheets}}",
+                                                                                      "auth": "{{connections['googleSheets']}}",
                                                                                       "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                                       "sheet_id": 4,
                                                                                       "first_row_headers": true,
@@ -1032,7 +1032,7 @@
                                                                                   "actionName": "sheets_add_row",
                                                                                   "propertySettings": {},
                                                                                   "input": {
-                                                                                    "auth": "{{connections.googleSheets}}",
+                                                                                    "auth": "{{connections['googleSheets']}}",
                                                                                     "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                                     "sheet_id": 4,
                                                                                     "first_row_headers": true,
@@ -1068,7 +1068,7 @@
                                                                       "actionName": "sheets_add_row",
                                                                       "propertySettings": {},
                                                                       "input": {
-                                                                        "auth": "{{connections.googleSheets}}",
+                                                                        "auth": "{{connections['googleSheets']}}",
                                                                         "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                         "sheet_id": 3,
                                                                         "first_row_headers": true,
@@ -1118,7 +1118,7 @@
                                                               "actionName": "sheets_add_row",
                                                               "propertySettings": {},
                                                               "input": {
-                                                                "auth": "{{connections.googleSheets}}",
+                                                                "auth": "{{connections['googleSheets']}}",
                                                                 "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                 "sheet_id": 2,
                                                                 "first_row_headers": true,
@@ -1191,7 +1191,7 @@
                                                                       "actionName": "gmail_create_draft",
                                                                       "propertySettings": {},
                                                                       "input": {
-                                                                        "auth": "{{connections.gmail}}",
+                                                                        "auth": "{{connections['gmail']}}",
                                                                         "receiver": [
                                                                           "{{parse_extraction.output.externalAttendee}}"
                                                                         ],
@@ -1212,7 +1212,7 @@
                                                                         "actionName": "request_approval_message",
                                                                         "propertySettings": {},
                                                                         "input": {
-                                                                          "auth": "{{connections.slack}}",
+                                                                          "auth": "{{connections['slack']}}",
                                                                           "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                                           "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_skip.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (also saved to your Gmail Drafts):\nSubject: {{parse_draft_skip.output.emailSubject}}\n\n{{parse_draft_skip.output.emailBody}}\n\nApprove to send — Reject to keep the draft for edits. Nothing sends without your tap."
                                                                         }
@@ -1258,7 +1258,7 @@
                                                                               "actionName": "gmail_send_draft",
                                                                               "propertySettings": {},
                                                                               "input": {
-                                                                                "auth": "{{connections.gmail}}",
+                                                                                "auth": "{{connections['gmail']}}",
                                                                                 "draft_id": "{{create_draft_skip.output.id}}"
                                                                               }
                                                                             },
@@ -1274,7 +1274,7 @@
                                                                                 "actionName": "sheets_add_row",
                                                                                 "propertySettings": {},
                                                                                 "input": {
-                                                                                  "auth": "{{connections.googleSheets}}",
+                                                                                  "auth": "{{connections['googleSheets']}}",
                                                                                   "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                                   "sheet_id": 4,
                                                                                   "first_row_headers": true,
@@ -1304,7 +1304,7 @@
                                                                               "actionName": "sheets_add_row",
                                                                               "propertySettings": {},
                                                                               "input": {
-                                                                                "auth": "{{connections.googleSheets}}",
+                                                                                "auth": "{{connections['googleSheets']}}",
                                                                                 "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                                 "sheet_id": 4,
                                                                                 "first_row_headers": true,
@@ -1340,7 +1340,7 @@
                                                                   "actionName": "sheets_add_row",
                                                                   "propertySettings": {},
                                                                   "input": {
-                                                                    "auth": "{{connections.googleSheets}}",
+                                                                    "auth": "{{connections['googleSheets']}}",
                                                                     "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
                                                                     "sheet_id": 3,
                                                                     "first_row_headers": true,
