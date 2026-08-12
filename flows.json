@@ -1,0 +1,1436 @@
+{
+  "name": "Sales Call Logger & Follow-up Drafter",
+  "type": "SHARED",
+  "summary": "Scheduled sweep of Gmail (and Drive) transcript sources, fingerprint dedup, AI extraction with guardrails, and a Slack one-tap approval that gates the follow-up email.",
+  "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail (and Drive) transcript sources, fingerprint dedup, AI extraction with guardrails, Slack recap + one-tap approval for the follow-up email, all writes landing in a Deal Tracker sheet.",
+  "tags": [],
+  "blogUrl": "",
+  "metadata": {
+    "externalId": "sales-call-logger-followup-drafter"
+  },
+  "author": "",
+  "categories": [],
+  "pieces": [
+    "@activepieces/piece-schedule",
+    "@activepieces/piece-gmail",
+    "@activepieces/piece-googleDrive",
+    "@activepieces/piece-googleSheets",
+    "@activepieces/piece-slack",
+    "@activepieces/piece-openai"
+  ],
+  "flows": [
+    {
+      "type": "FLOW_VERSION",
+      "id": "EPeLSzIJir8pM5EXK5ylY",
+      "flowId": "jc1MRyF6tiVMVo7mBKrMJ",
+      "displayName": "Sales Call Logger & Follow-up Drafter",
+      "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail (and Drive) transcript sources, fingerprint dedup, AI extraction with guardrails, Slack recap + one-tap approval for the follow-up email, all writes landing in a Deal Tracker sheet.",
+      "trigger": {
+        "type": "PIECE_TRIGGER",
+        "name": "trigger_sweep",
+        "displayName": "Sweep every 5 minutes",
+        "valid": true,
+        "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+        "settings": {
+          "pieceName": "@activepieces/piece-schedule",
+          "pieceVersion": "0.1.21",
+          "triggerName": "cron_expression",
+          "propertySettings": {},
+          "input": {
+            "cronExpression": "*/5 * * * *",
+            "timezone": "UTC"
+          }
+        },
+        "nextAction": {
+          "type": "CODE",
+          "name": "sweep_window",
+          "displayName": "Sweep window",
+          "valid": true,
+          "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+          "settings": {
+            "sourceCode": {
+              "packageJson": "{}",
+              "code": "export const code = async () => {\n  const sinceIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();\n  const nowIso = new Date().toISOString();\n  return { sinceIso, nowIso };\n};"
+            },
+            "input": {}
+          },
+          "nextAction": {
+            "type": "PIECE",
+            "name": "search_gmail",
+            "displayName": "Search transcript emails",
+            "valid": true,
+            "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+            "settings": {
+              "pieceName": "@activepieces/piece-gmail",
+              "pieceVersion": "0.12.10",
+              "actionName": "gmail_search_email",
+              "propertySettings": {},
+              "input": {
+                "auth": "{{connections.gmail}}",
+                "from": "",
+                "after_date": "{{sweep_window.output.sinceIso}}",
+                "max_results": 10,
+                "include_spam_trash": false
+              }
+            },
+            "nextAction": {
+              "type": "PIECE",
+              "name": "list_drive",
+              "displayName": "List transcript folder (Drive)",
+              "valid": true,
+              "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+              "settings": {
+                "pieceName": "@activepieces/piece-googleDrive",
+                "pieceVersion": "0.8.3",
+                "actionName": "drive_list_files",
+                "propertySettings": {},
+                "input": {
+                  "auth": "{{connections.googleDrive}}",
+                  "folder_id": "REPLACE_WITH_TRANSCRIPT_FOLDER_ID",
+                  "include_trashed": false,
+                  "depth_level": 1,
+                  "download_files": false,
+                  "include_team_drives": false
+                }
+              },
+              "nextAction": {
+                "type": "CODE",
+                "name": "pick_candidate",
+                "displayName": "Pick newest transcript",
+                "valid": true,
+                "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                "settings": {
+                  "sourceCode": {
+                    "packageJson": "{}",
+                    "code": "export const code = async (params) => {\n  function hash(str) {\n    let h = 5381;\n    for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;\n    return (h >>> 0).toString(16);\n  }\n  // Gmail transcript emails are the first-class source (PRD §6).\n  const results = params.search_gmail ?? {};\n  const messages = Array.isArray(results.messages) ? results.messages : [];\n  const emails = messages\n    .map((m) => ({\n      source: 'gmail',\n      id: m?.id ?? '',\n      subject: m?.subject ?? '',\n      from: m?.from?.text ?? '',\n      date: m?.date ?? '',\n      body: String(m?.text ?? '').replace(/\\s+/g, ' ').trim(),\n      link: m?.id ? `https://mail.google.com/mail/u/0/#inbox/${m.id}` : '',\n    }))\n    .filter((c) => c.date && c.body.length > 0);\n  emails.sort((a, b) => new Date(b.date) - new Date(a.date));\n  const candidate = emails[0] ?? null;\n  // Fingerprint: call date + sender + transcript body hash. A re-run of the\n  // same sweep window produces the same fingerprint, so _ProcessedCalls turns\n  // repeats into a no-op (PRD §13).\n  return {\n    candidate,\n    fingerprint: candidate\n      ? hash(candidate.date + '|' + candidate.from + '|' + candidate.body.slice(0, 2000))\n      : '',\n    found: candidate !== null,\n  };\n};"
+                  },
+                  "input": {
+                    "search_gmail": "{{search_gmail.output.results}}"
+                  }
+                },
+                "nextAction": {
+                  "type": "ROUTER",
+                  "name": "candidate_gate",
+                  "displayName": "Any transcript this sweep?",
+                  "valid": true,
+                  "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                  "settings": {
+                    "branches": [
+                      {
+                        "conditions": [
+                          [
+                            {
+                              "firstValue": "{{pick_candidate.output.found}}",
+                              "secondValue": "false",
+                              "operator": "TEXT_EXACTLY_MATCHES"
+                            }
+                          ]
+                        ],
+                        "branchType": "CONDITION",
+                        "branchName": "nothing_found"
+                      },
+                      {
+                        "branchType": "FALLBACK",
+                        "branchName": "has_candidate"
+                      }
+                    ],
+                    "executionType": "EXECUTE_FIRST_MATCH"
+                  },
+                  "children": [
+                    null,
+                    {
+                      "type": "PIECE",
+                      "name": "check_processed",
+                      "displayName": "Check already processed",
+                      "valid": true,
+                      "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                      "settings": {
+                        "pieceName": "@activepieces/piece-googleSheets",
+                        "pieceVersion": "0.16.7",
+                        "actionName": "sheets_find_rows",
+                        "propertySettings": {},
+                        "input": {
+                          "auth": "{{connections.googleSheets}}",
+                          "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                          "sheet_id": 4,
+                          "column_name": "A",
+                          "search_value": "{{pick_candidate.output.fingerprint}}",
+                          "match_case": true,
+                          "number_of_rows": 1
+                        }
+                      },
+                      "nextAction": {
+                        "type": "CODE",
+                        "name": "check_dedup",
+                        "displayName": "Dedup verdict",
+                        "valid": true,
+                        "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                        "settings": {
+                          "sourceCode": {
+                            "packageJson": "{}",
+                            "code": "export const code = async (params) => {\n  const rows = Array.isArray(params.check_processed?.rows) ? params.check_processed.rows : [];\n  return { count: rows.length, alreadyProcessed: rows.length > 0 };\n};"
+                          },
+                          "input": {
+                            "check_processed": "{{check_processed.output}}"
+                          }
+                        },
+                        "nextAction": {
+                          "type": "ROUTER",
+                          "name": "dedup_gate",
+                          "displayName": "Already processed?",
+                          "valid": true,
+                          "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                          "settings": {
+                            "branches": [
+                              {
+                                "conditions": [
+                                  [
+                                    {
+                                      "firstValue": "{{check_dedup.output.alreadyProcessed}}",
+                                      "secondValue": "true",
+                                      "operator": "TEXT_EXACTLY_MATCHES"
+                                    }
+                                  ]
+                                ],
+                                "branchType": "CONDITION",
+                                "branchName": "already_processed"
+                              },
+                              {
+                                "branchType": "FALLBACK",
+                                "branchName": "new_call"
+                              }
+                            ],
+                            "executionType": "EXECUTE_FIRST_MATCH"
+                          },
+                          "children": [
+                            null,
+                            {
+                              "type": "CODE",
+                              "name": "readability_check",
+                              "displayName": "Readability check",
+                              "valid": true,
+                              "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                              "settings": {
+                                "sourceCode": {
+                                  "packageJson": "{}",
+                                  "code": "export const code = async (params) => {\n  const body = String(params.candidate?.body ?? '').trim();\n  // A teaser (summary-only / link-only / garbled) is never treated as the call\n  // (PRD §12). Heuristic: a real transcript is long enough to process.\n  const readable = body.length >= 200;\n  return { readable, verdict: readable ? 'process' : 'unreadable' };\n};"
+                                },
+                                "input": {
+                                  "candidate": "{{pick_candidate.output.candidate}}"
+                                }
+                              },
+                              "nextAction": {
+                                "type": "ROUTER",
+                                "name": "quality_gate",
+                                "displayName": "Readable?",
+                                "valid": true,
+                                "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                "settings": {
+                                  "branches": [
+                                    {
+                                      "conditions": [
+                                        [
+                                          {
+                                            "firstValue": "{{readability_check.output.verdict}}",
+                                            "secondValue": "unreadable",
+                                            "operator": "TEXT_EXACTLY_MATCHES"
+                                          }
+                                        ]
+                                      ],
+                                      "branchType": "CONDITION",
+                                      "branchName": "unreadable"
+                                    },
+                                    {
+                                      "branchType": "FALLBACK",
+                                      "branchName": "process"
+                                    }
+                                  ],
+                                  "executionType": "EXECUTE_FIRST_MATCH"
+                                },
+                                "children": [
+                                  {
+                                    "type": "PIECE",
+                                    "name": "notify_unreadable",
+                                    "displayName": "Notify: could not process",
+                                    "valid": true,
+                                    "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                    "settings": {
+                                      "pieceName": "@activepieces/piece-slack",
+                                      "pieceVersion": "0.17.8",
+                                      "actionName": "slack_post_message",
+                                      "propertySettings": {},
+                                      "input": {
+                                        "auth": "{{connections.slack}}",
+                                        "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
+                                        "text": ":warning: *Call transcript could not be processed*\nSource: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.subject}}\nDate: {{pick_candidate.output.candidate.date}}\nThe transcript was empty or unreadable, so nothing was logged and no follow-up was drafted. Please handle this call manually:\n{{pick_candidate.output.candidate.link}}"
+                                      }
+                                    },
+                                    "nextAction": {
+                                      "type": "PIECE",
+                                      "name": "log_unreadable",
+                                      "displayName": "Log unreadable call",
+                                      "valid": true,
+                                      "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                      "settings": {
+                                        "pieceName": "@activepieces/piece-googleSheets",
+                                        "pieceVersion": "0.16.7",
+                                        "actionName": "sheets_add_row",
+                                        "propertySettings": {},
+                                        "input": {
+                                          "auth": "{{connections.googleSheets}}",
+                                          "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                          "sheet_id": 4,
+                                          "first_row_headers": true,
+                                          "as_string": false,
+                                          "values": {
+                                            "A": "{{pick_candidate.output.fingerprint}}",
+                                            "B": "{{pick_candidate.output.candidate.source}}",
+                                            "C": "{{sweep_window.output.nowIso}}",
+                                            "D": "flagged-unreadable",
+                                            "E": "",
+                                            "F": ""
+                                          }
+                                        }
+                                      },
+                                      "nextAction": null
+                                    }
+                                  },
+                                  {
+                                    "type": "PIECE",
+                                    "name": "extract_facts",
+                                    "displayName": "Extract call facts (AI)",
+                                    "valid": true,
+                                    "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                    "settings": {
+                                      "pieceName": "@activepieces/piece-openai",
+                                      "pieceVersion": "0.10.3",
+                                      "actionName": "ask_chatgpt",
+                                      "propertySettings": {},
+                                      "input": {
+                                        "auth": "{{connections.openai}}",
+                                        "model": "gpt-4o-mini",
+                                        "prompt": "Analyze the sales call transcript below and return ONLY valid JSON with this exact shape:\n{\n  \"summary\": \"string — 3-6 sentences covering what was discussed and decided\",\n  \"objections\": [\"string — verbatim objections raised by the customer\"],\n  \"commitments\": [\"string — verbatim promises made on either side\"],\n  \"nextSteps\": [{\"task\": \"string\", \"owner\": \"REP | CLIENT | OTHER\", \"dueDate\": \"YYYY-MM-DD or Not specified\"}],\n  \"stageSignal\": null | {\"signal\": \"exact quote from the transcript\", \"newStage\": \"string\"},\n  \"externalAttendee\": \"customer email if any, else empty string\",\n  \"suggestedAccount\": \"customer company name if stated, else empty string\"\n}\n\nRules:\n- Quote objections and commitments verbatim — never paraphrase or soften.\n- Never invent a due date. Use \"Not specified\" when none is stated or reasonably inferable.\n- Only set stageSignal when there is an explicit, quotable signal to move the deal forward.\n- nextSteps: capture every stated or clearly implied next step; leave owner/dueDate conservative.\n\nTranscript:\n{{pick_candidate.output.candidate.body}}",
+                                        "temperature": 0,
+                                        "maxTokens": 2500,
+                                        "topP": 1,
+                                        "roles": [
+                                          {
+                                            "role": "system",
+                                            "content": "You are a rigorous sales-call analyst. You extract facts ONLY from the transcript provided. Never invent, soften, or infer beyond what was said.\n- Objections and commitments must be quoted verbatim in the caller's language.\n- A due date that is not stated or reasonably inferable is recorded as \"Not specified\" — never guessed.\n- A stage change signal only exists when someone explicitly asks to move forward, requests a contract, etc. Otherwise stageSignal is null.\n- If every participant is internal (no external customer email), externalAttendee is an empty string.\n- suggestedAccount is the customer's company name as stated in the call, or \"\" if unknown.\nRespond with ONLY valid JSON."
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "nextAction": {
+                                      "type": "CODE",
+                                      "name": "parse_extraction",
+                                      "displayName": "Parse extraction",
+                                      "valid": true,
+                                      "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                      "settings": {
+                                        "sourceCode": {
+                                          "packageJson": "{}",
+                                          "code": "export const code = async (params) => {\n  const raw = String(params.extract_facts?.choices?.[0]?.message?.content ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    // Never drop a call silently: degrade to a raw summary, no invented facts.\n    p = { summary: raw.slice(0, 2000), objections: [], commitments: [], nextSteps: [], stageSignal: null, externalAttendee: '', suggestedAccount: '' };\n  }\n  const tasks = (Array.isArray(p.nextSteps) ? p.nextSteps : [])\n    .map((t) => ({\n      task: String(t?.task ?? '').trim(),\n      owner: String(t?.owner ?? 'Not specified').trim(),\n      dueDate: /^\\d{4}-\\d{2}-\\d{2}$/.test(String(t?.dueDate ?? '')) ? String(t.dueDate) : 'Not specified',\n    }))\n    .filter((t) => t.task.length > 0);\n  const externalAttendee = String(p.externalAttendee ?? '').trim();\n  const stageSignal =\n    p.stageSignal && typeof p.stageSignal === 'object' && p.stageSignal.signal\n      ? { signal: String(p.stageSignal.signal), newStage: String(p.stageSignal.newStage ?? '') }\n      : null;\n  return {\n    summary: String(p.summary ?? '').trim(),\n    objections: Array.isArray(p.objections) ? p.objections.map(String) : [],\n    commitments: Array.isArray(p.commitments) ? p.commitments.map(String) : [],\n    tasks,\n    stageSignal,\n    externalAttendee,\n    hasExternal: externalAttendee.length > 0,\n    suggestedAccount: String(p.suggestedAccount ?? '').trim(),\n  };\n};"
+                                        },
+                                        "input": {
+                                          "extract_facts": "{{extract_facts.output}}"
+                                        }
+                                      },
+                                      "nextAction": {
+                                        "type": "ROUTER",
+                                        "name": "attendee_gate",
+                                        "displayName": "External attendees?",
+                                        "valid": true,
+                                        "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                        "settings": {
+                                          "branches": [
+                                            {
+                                              "conditions": [
+                                                [
+                                                  {
+                                                    "firstValue": "{{parse_extraction.output.hasExternal}}",
+                                                    "secondValue": "false",
+                                                    "operator": "TEXT_EXACTLY_MATCHES"
+                                                  }
+                                                ]
+                                              ],
+                                              "branchType": "CONDITION",
+                                              "branchName": "internal_only"
+                                            },
+                                            {
+                                              "branchType": "FALLBACK",
+                                              "branchName": "process"
+                                            }
+                                          ],
+                                          "executionType": "EXECUTE_FIRST_MATCH"
+                                        },
+                                        "children": [
+                                          {
+                                            "type": "PIECE",
+                                            "name": "log_skipped_internal",
+                                            "displayName": "Log internal call (skipped)",
+                                            "valid": true,
+                                            "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                            "settings": {
+                                              "pieceName": "@activepieces/piece-googleSheets",
+                                              "pieceVersion": "0.16.7",
+                                              "actionName": "sheets_add_row",
+                                              "propertySettings": {},
+                                              "input": {
+                                                "auth": "{{connections.googleSheets}}",
+                                                "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                "sheet_id": 4,
+                                                "first_row_headers": true,
+                                                "as_string": false,
+                                                "values": {
+                                                  "A": "{{pick_candidate.output.fingerprint}}",
+                                                  "B": "{{pick_candidate.output.candidate.source}}",
+                                                  "C": "{{sweep_window.output.nowIso}}",
+                                                  "D": "skipped-internal",
+                                                  "E": "",
+                                                  "F": ""
+                                                }
+                                              }
+                                            },
+                                            "nextAction": null
+                                          },
+                                          {
+                                            "type": "PIECE",
+                                            "name": "match_deal",
+                                            "displayName": "Match deal by account",
+                                            "valid": true,
+                                            "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                            "settings": {
+                                              "pieceName": "@activepieces/piece-googleSheets",
+                                              "pieceVersion": "0.16.7",
+                                              "actionName": "sheets_find_rows",
+                                              "propertySettings": {},
+                                              "input": {
+                                                "auth": "{{connections.googleSheets}}",
+                                                "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                "sheet_id": 0,
+                                                "column_name": "A",
+                                                "search_value": "{{parse_extraction.output.suggestedAccount}}",
+                                                "match_case": false,
+                                                "number_of_rows": 1
+                                              }
+                                            },
+                                            "nextAction": {
+                                              "type": "CODE",
+                                              "name": "deal_match_check",
+                                              "displayName": "Deal match verdict",
+                                              "valid": true,
+                                              "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                              "settings": {
+                                                "sourceCode": {
+                                                  "packageJson": "{}",
+                                                  "code": "export const code = async (params) => {\n  const rows = Array.isArray(params.match_deal?.rows) ? params.match_deal.rows : [];\n  const first = rows[0] ?? {};\n  const values = first.values ?? {};\n  return {\n    matched: rows.length > 0,\n    count: rows.length,\n    dealId: String(values.A ?? values['Deal ID'] ?? '').trim(),\n  };\n};"
+                                                },
+                                                "input": {
+                                                  "match_deal": "{{match_deal.output}}"
+                                                }
+                                              },
+                                              "nextAction": {
+                                                "type": "ROUTER",
+                                                "name": "deal_gate",
+                                                "displayName": "Deal matched?",
+                                                "valid": true,
+                                                "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                "settings": {
+                                                  "branches": [
+                                                    {
+                                                      "conditions": [
+                                                        [
+                                                          {
+                                                            "firstValue": "{{deal_match_check.output.matched}}",
+                                                            "secondValue": "true",
+                                                            "operator": "TEXT_EXACTLY_MATCHES"
+                                                          }
+                                                        ]
+                                                      ],
+                                                      "branchType": "CONDITION",
+                                                      "branchName": "deal_matched"
+                                                    },
+                                                    {
+                                                      "branchType": "FALLBACK",
+                                                      "branchName": "no_match"
+                                                    }
+                                                  ],
+                                                  "executionType": "EXECUTE_FIRST_MATCH"
+                                                },
+                                                "children": [
+                                                  {
+                                                    "type": "CODE",
+                                                    "name": "pipeline_ctx_match",
+                                                    "displayName": "Pipeline context",
+                                                    "valid": true,
+                                                    "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                    "settings": {
+                                                      "sourceCode": {
+                                                        "packageJson": "{}",
+                                                        "code": "export const code = async (params) => {\n  return {\n    noteId: 'note_' + Date.now().toString(36),\n    dealRef: String(params.dealRef ?? ''),\n    nowIso: new Date().toISOString(),\n  };\n};"
+                                                      },
+                                                      "input": {
+                                                        "dealRef": "{{deal_match_check.output.dealId}}"
+                                                      }
+                                                    },
+                                                    "nextAction": {
+                                                      "type": "PIECE",
+                                                      "name": "log_call_notes_match",
+                                                      "displayName": "Log call notes",
+                                                      "valid": true,
+                                                      "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                      "settings": {
+                                                        "pieceName": "@activepieces/piece-googleSheets",
+                                                        "pieceVersion": "0.16.7",
+                                                        "actionName": "sheets_add_row",
+                                                        "propertySettings": {},
+                                                        "input": {
+                                                          "auth": "{{connections.googleSheets}}",
+                                                          "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                          "sheet_id": 2,
+                                                          "first_row_headers": true,
+                                                          "as_string": false,
+                                                          "values": {
+                                                            "A": "{{pipeline_ctx_match.output.noteId}}",
+                                                            "B": "{{pipeline_ctx_match.output.dealRef}}",
+                                                            "C": "{{parse_extraction.output.externalAttendee}}",
+                                                            "D": "{{pick_candidate.output.candidate.date}}",
+                                                            "E": "{{parse_extraction.output.summary}}",
+                                                            "F": "{{parse_extraction.output.objections}}",
+                                                            "G": "{{parse_extraction.output.commitments}}",
+                                                            "H": "{{pick_candidate.output.candidate.source}}",
+                                                            "I": "{{pick_candidate.output.candidate.link}}"
+                                                          }
+                                                        }
+                                                      },
+                                                      "nextAction": {
+                                                        "type": "LOOP_ON_ITEMS",
+                                                        "name": "loop_tasks_match",
+                                                        "displayName": "Log each next step",
+                                                        "valid": true,
+                                                        "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                        "settings": {
+                                                          "items": "{{parse_extraction.output.tasks}}"
+                                                        },
+                                                        "nextAction": {
+                                                          "type": "PIECE",
+                                                          "name": "draft_followup_match",
+                                                          "displayName": "Draft follow-up email",
+                                                          "valid": true,
+                                                          "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                          "settings": {
+                                                            "pieceName": "@activepieces/piece-openai",
+                                                            "pieceVersion": "0.10.3",
+                                                            "actionName": "ask_chatgpt",
+                                                            "propertySettings": {},
+                                                            "input": {
+                                                              "auth": "{{connections.openai}}",
+                                                              "model": "gpt-4o-mini",
+                                                              "prompt": "Write a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
+                                                              "temperature": 0.7,
+                                                              "maxTokens": 800,
+                                                              "topP": 1,
+                                                              "roles": [
+                                                                {
+                                                                  "role": "system",
+                                                                  "content": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs)."
+                                                                }
+                                                              ]
+                                                            }
+                                                          },
+                                                          "nextAction": {
+                                                            "type": "CODE",
+                                                            "name": "parse_draft_match",
+                                                            "displayName": "Parse draft",
+                                                            "valid": true,
+                                                            "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                            "settings": {
+                                                              "sourceCode": {
+                                                                "packageJson": "{}",
+                                                                "code": "export const code = async (params) => {\n  const raw = String(params.draft_followup?.choices?.[0]?.message?.content ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    p = { email_subject: '', email_body: raw };\n  }\n  return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };\n};"
+                                                              },
+                                                              "input": {
+                                                                "draft_followup": "{{draft_followup_match.output}}"
+                                                              }
+                                                            },
+                                                            "nextAction": {
+                                                              "type": "PIECE",
+                                                              "name": "create_draft_match",
+                                                              "displayName": "Save draft to Gmail",
+                                                              "valid": true,
+                                                              "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                              "settings": {
+                                                                "pieceName": "@activepieces/piece-gmail",
+                                                                "pieceVersion": "0.12.10",
+                                                                "actionName": "gmail_create_draft",
+                                                                "propertySettings": {},
+                                                                "input": {
+                                                                  "auth": "{{connections.gmail}}",
+                                                                  "receiver": [
+                                                                    "{{parse_extraction.output.externalAttendee}}"
+                                                                  ],
+                                                                  "subject": "{{parse_draft_match.output.emailSubject}}",
+                                                                  "body_type": "plain_text",
+                                                                  "body": "{{parse_draft_match.output.emailBody}}"
+                                                                }
+                                                              },
+                                                              "nextAction": {
+                                                                "type": "PIECE",
+                                                                "name": "request_approval_match",
+                                                                "displayName": "Post recap & request approval",
+                                                                "valid": true,
+                                                                "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                "settings": {
+                                                                  "pieceName": "@activepieces/piece-slack",
+                                                                  "pieceVersion": "0.17.8",
+                                                                  "actionName": "request_approval_message",
+                                                                  "propertySettings": {},
+                                                                  "input": {
+                                                                    "auth": "{{connections.slack}}",
+                                                                    "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
+                                                                    "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_match.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (also saved to your Gmail Drafts):\nSubject: {{parse_draft_match.output.emailSubject}}\n\n{{parse_draft_match.output.emailBody}}\n\nApprove to send — Reject to keep the draft for edits. Nothing sends without your tap."
+                                                                  }
+                                                                },
+                                                                "nextAction": {
+                                                                  "type": "ROUTER",
+                                                                  "name": "approval_gate_match",
+                                                                  "displayName": "Approval gate",
+                                                                  "valid": true,
+                                                                  "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                  "settings": {
+                                                                    "branches": [
+                                                                      {
+                                                                        "conditions": [
+                                                                          [
+                                                                            {
+                                                                              "firstValue": "{{request_approval_match.output.approved}}",
+                                                                              "secondValue": "true",
+                                                                              "operator": "TEXT_EXACTLY_MATCHES"
+                                                                            }
+                                                                          ]
+                                                                        ],
+                                                                        "branchType": "CONDITION",
+                                                                        "branchName": "approved"
+                                                                      },
+                                                                      {
+                                                                        "branchType": "FALLBACK",
+                                                                        "branchName": "rejected"
+                                                                      }
+                                                                    ],
+                                                                    "executionType": "EXECUTE_FIRST_MATCH"
+                                                                  },
+                                                                  "children": [
+                                                                    {
+                                                                      "type": "PIECE",
+                                                                      "name": "send_draft_match",
+                                                                      "displayName": "Send approved follow-up",
+                                                                      "valid": true,
+                                                                      "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                      "settings": {
+                                                                        "pieceName": "@activepieces/piece-gmail",
+                                                                        "pieceVersion": "0.12.10",
+                                                                        "actionName": "gmail_send_draft",
+                                                                        "propertySettings": {},
+                                                                        "input": {
+                                                                          "auth": "{{connections.gmail}}",
+                                                                          "draft_id": "{{create_draft_match.output.id}}"
+                                                                        }
+                                                                      },
+                                                                      "nextAction": {
+                                                                        "type": "PIECE",
+                                                                        "name": "log_processed_sent_match",
+                                                                        "displayName": "Mark processed (sent)",
+                                                                        "valid": true,
+                                                                        "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                        "settings": {
+                                                                          "pieceName": "@activepieces/piece-googleSheets",
+                                                                          "pieceVersion": "0.16.7",
+                                                                          "actionName": "sheets_add_row",
+                                                                          "propertySettings": {},
+                                                                          "input": {
+                                                                            "auth": "{{connections.googleSheets}}",
+                                                                            "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                            "sheet_id": 4,
+                                                                            "first_row_headers": true,
+                                                                            "as_string": false,
+                                                                            "values": {
+                                                                              "A": "{{pick_candidate.output.fingerprint}}",
+                                                                              "B": "{{pick_candidate.output.candidate.source}}",
+                                                                              "C": "{{pipeline_ctx_match.output.nowIso}}",
+                                                                              "D": "logged",
+                                                                              "E": "{{pipeline_ctx_match.output.dealRef}}",
+                                                                              "F": "sent"
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        "nextAction": null
+                                                                      }
+                                                                    },
+                                                                    {
+                                                                      "type": "PIECE",
+                                                                      "name": "log_processed_rejected_match",
+                                                                      "displayName": "Mark processed (rejected)",
+                                                                      "valid": true,
+                                                                      "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                      "settings": {
+                                                                        "pieceName": "@activepieces/piece-googleSheets",
+                                                                        "pieceVersion": "0.16.7",
+                                                                        "actionName": "sheets_add_row",
+                                                                        "propertySettings": {},
+                                                                        "input": {
+                                                                          "auth": "{{connections.googleSheets}}",
+                                                                          "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                          "sheet_id": 4,
+                                                                          "first_row_headers": true,
+                                                                          "as_string": false,
+                                                                          "values": {
+                                                                            "A": "{{pick_candidate.output.fingerprint}}",
+                                                                            "B": "{{pick_candidate.output.candidate.source}}",
+                                                                            "C": "{{pipeline_ctx_match.output.nowIso}}",
+                                                                            "D": "logged",
+                                                                            "E": "{{pipeline_ctx_match.output.dealRef}}",
+                                                                            "F": "rejected"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "nextAction": null
+                                                                    }
+                                                                  ],
+                                                                  "nextAction": null
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        },
+                                                        "firstLoopAction": {
+                                                          "type": "PIECE",
+                                                          "name": "log_task_row_match",
+                                                          "displayName": "Log task",
+                                                          "valid": true,
+                                                          "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                          "settings": {
+                                                            "pieceName": "@activepieces/piece-googleSheets",
+                                                            "pieceVersion": "0.16.7",
+                                                            "actionName": "sheets_add_row",
+                                                            "propertySettings": {},
+                                                            "input": {
+                                                              "auth": "{{connections.googleSheets}}",
+                                                              "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                              "sheet_id": 3,
+                                                              "first_row_headers": true,
+                                                              "as_string": false,
+                                                              "values": {
+                                                                "A": "{{pipeline_ctx_match.output.noteId}}-t{{loop_tasks_match.output.index}}",
+                                                                "B": "{{pipeline_ctx_match.output.dealRef}}",
+                                                                "C": "{{loop_tasks_match.output.item.task}}",
+                                                                "D": "{{loop_tasks_match.output.item.owner}}",
+                                                                "E": "{{loop_tasks_match.output.item.dueDate}}",
+                                                                "F": "open",
+                                                                "G": "{{pick_candidate.output.candidate.id}}"
+                                                              }
+                                                            }
+                                                          },
+                                                          "nextAction": null
+                                                        }
+                                                      }
+                                                    }
+                                                  },
+                                                  {
+                                                    "type": "PIECE",
+                                                    "name": "deal_prompt",
+                                                    "displayName": "Ask: create deal?",
+                                                    "valid": true,
+                                                    "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                    "settings": {
+                                                      "pieceName": "@activepieces/piece-slack",
+                                                      "pieceVersion": "0.17.8",
+                                                      "actionName": "request_action_message",
+                                                      "propertySettings": {},
+                                                      "input": {
+                                                        "auth": "{{connections.slack}}",
+                                                        "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
+                                                        "text": ":thinking_face: No deal found for *{{parse_extraction.output.suggestedAccount}}*\nCall: {{pick_candidate.output.candidate.subject}} ({{pick_candidate.output.candidate.date}})\nExternal attendee: {{parse_extraction.output.externalAttendee}}\nCreate a new deal, or skip and log the call without one.",
+                                                        "actions": [
+                                                          {
+                                                            "label": "Create deal",
+                                                            "style": "primary"
+                                                          },
+                                                          {
+                                                            "label": "Skip",
+                                                            "style": "default"
+                                                          }
+                                                        ]
+                                                      }
+                                                    },
+                                                    "nextAction": {
+                                                      "type": "ROUTER",
+                                                      "name": "deal_choice",
+                                                      "displayName": "Create or skip?",
+                                                      "valid": true,
+                                                      "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                      "settings": {
+                                                        "branches": [
+                                                          {
+                                                            "conditions": [
+                                                              [
+                                                                {
+                                                                  "firstValue": "{{deal_prompt.output.action}}",
+                                                                  "secondValue": "Create deal",
+                                                                  "operator": "TEXT_CONTAINS"
+                                                                }
+                                                              ]
+                                                            ],
+                                                            "branchType": "CONDITION",
+                                                            "branchName": "create_deal"
+                                                          },
+                                                          {
+                                                            "branchType": "FALLBACK",
+                                                            "branchName": "skip"
+                                                          }
+                                                        ],
+                                                        "executionType": "EXECUTE_FIRST_MATCH"
+                                                      },
+                                                      "children": [
+                                                        {
+                                                          "type": "CODE",
+                                                          "name": "new_deal_id",
+                                                          "displayName": "New deal id",
+                                                          "valid": true,
+                                                          "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                          "settings": {
+                                                            "sourceCode": {
+                                                              "packageJson": "{}",
+                                                              "code": "export const code = async () => {\n  return { dealId: 'deal_' + Date.now().toString(36), createdAt: new Date().toISOString() };\n};"
+                                                            },
+                                                            "input": {}
+                                                          },
+                                                          "nextAction": {
+                                                            "type": "PIECE",
+                                                            "name": "create_deal_sheet",
+                                                            "displayName": "Create deal row",
+                                                            "valid": true,
+                                                            "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                            "settings": {
+                                                              "pieceName": "@activepieces/piece-googleSheets",
+                                                              "pieceVersion": "0.16.7",
+                                                              "actionName": "sheets_add_row",
+                                                              "propertySettings": {},
+                                                              "input": {
+                                                                "auth": "{{connections.googleSheets}}",
+                                                                "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                "sheet_id": 0,
+                                                                "first_row_headers": true,
+                                                                "as_string": false,
+                                                                "values": {
+                                                                  "A": "{{new_deal_id.output.dealId}}",
+                                                                  "B": "{{parse_extraction.output.suggestedAccount}}",
+                                                                  "C": "{{parse_extraction.output.suggestedAccount}}",
+                                                                  "D": "{{parse_extraction.output.externalAttendee}}",
+                                                                  "E": "Discovery",
+                                                                  "F": "",
+                                                                  "G": "{{pick_candidate.output.candidate.date}}",
+                                                                  "H": "{{sweep_window.output.nowIso}}",
+                                                                  "I": ""
+                                                                }
+                                                              }
+                                                            },
+                                                            "nextAction": {
+                                                              "type": "CODE",
+                                                              "name": "pipeline_ctx_create",
+                                                              "displayName": "Pipeline context",
+                                                              "valid": true,
+                                                              "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                              "settings": {
+                                                                "sourceCode": {
+                                                                  "packageJson": "{}",
+                                                                  "code": "export const code = async (params) => {\n  return {\n    noteId: 'note_' + Date.now().toString(36),\n    dealRef: String(params.dealRef ?? ''),\n    nowIso: new Date().toISOString(),\n  };\n};"
+                                                                },
+                                                                "input": {
+                                                                  "dealRef": "{{new_deal_id.output.dealId}}"
+                                                                }
+                                                              },
+                                                              "nextAction": {
+                                                                "type": "PIECE",
+                                                                "name": "log_call_notes_create",
+                                                                "displayName": "Log call notes",
+                                                                "valid": true,
+                                                                "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                "settings": {
+                                                                  "pieceName": "@activepieces/piece-googleSheets",
+                                                                  "pieceVersion": "0.16.7",
+                                                                  "actionName": "sheets_add_row",
+                                                                  "propertySettings": {},
+                                                                  "input": {
+                                                                    "auth": "{{connections.googleSheets}}",
+                                                                    "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                    "sheet_id": 2,
+                                                                    "first_row_headers": true,
+                                                                    "as_string": false,
+                                                                    "values": {
+                                                                      "A": "{{pipeline_ctx_create.output.noteId}}",
+                                                                      "B": "{{pipeline_ctx_create.output.dealRef}}",
+                                                                      "C": "{{parse_extraction.output.externalAttendee}}",
+                                                                      "D": "{{pick_candidate.output.candidate.date}}",
+                                                                      "E": "{{parse_extraction.output.summary}}",
+                                                                      "F": "{{parse_extraction.output.objections}}",
+                                                                      "G": "{{parse_extraction.output.commitments}}",
+                                                                      "H": "{{pick_candidate.output.candidate.source}}",
+                                                                      "I": "{{pick_candidate.output.candidate.link}}"
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "nextAction": {
+                                                                  "type": "LOOP_ON_ITEMS",
+                                                                  "name": "loop_tasks_create",
+                                                                  "displayName": "Log each next step",
+                                                                  "valid": true,
+                                                                  "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                  "settings": {
+                                                                    "items": "{{parse_extraction.output.tasks}}"
+                                                                  },
+                                                                  "nextAction": {
+                                                                    "type": "PIECE",
+                                                                    "name": "draft_followup_create",
+                                                                    "displayName": "Draft follow-up email",
+                                                                    "valid": true,
+                                                                    "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                    "settings": {
+                                                                      "pieceName": "@activepieces/piece-openai",
+                                                                      "pieceVersion": "0.10.3",
+                                                                      "actionName": "ask_chatgpt",
+                                                                      "propertySettings": {},
+                                                                      "input": {
+                                                                        "auth": "{{connections.openai}}",
+                                                                        "model": "gpt-4o-mini",
+                                                                        "prompt": "Write a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
+                                                                        "temperature": 0.7,
+                                                                        "maxTokens": 800,
+                                                                        "topP": 1,
+                                                                        "roles": [
+                                                                          {
+                                                                            "role": "system",
+                                                                            "content": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs)."
+                                                                          }
+                                                                        ]
+                                                                      }
+                                                                    },
+                                                                    "nextAction": {
+                                                                      "type": "CODE",
+                                                                      "name": "parse_draft_create",
+                                                                      "displayName": "Parse draft",
+                                                                      "valid": true,
+                                                                      "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                      "settings": {
+                                                                        "sourceCode": {
+                                                                          "packageJson": "{}",
+                                                                          "code": "export const code = async (params) => {\n  const raw = String(params.draft_followup?.choices?.[0]?.message?.content ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    p = { email_subject: '', email_body: raw };\n  }\n  return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };\n};"
+                                                                        },
+                                                                        "input": {
+                                                                          "draft_followup": "{{draft_followup_create.output}}"
+                                                                        }
+                                                                      },
+                                                                      "nextAction": {
+                                                                        "type": "PIECE",
+                                                                        "name": "create_draft_create",
+                                                                        "displayName": "Save draft to Gmail",
+                                                                        "valid": true,
+                                                                        "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                        "settings": {
+                                                                          "pieceName": "@activepieces/piece-gmail",
+                                                                          "pieceVersion": "0.12.10",
+                                                                          "actionName": "gmail_create_draft",
+                                                                          "propertySettings": {},
+                                                                          "input": {
+                                                                            "auth": "{{connections.gmail}}",
+                                                                            "receiver": [
+                                                                              "{{parse_extraction.output.externalAttendee}}"
+                                                                            ],
+                                                                            "subject": "{{parse_draft_create.output.emailSubject}}",
+                                                                            "body_type": "plain_text",
+                                                                            "body": "{{parse_draft_create.output.emailBody}}"
+                                                                          }
+                                                                        },
+                                                                        "nextAction": {
+                                                                          "type": "PIECE",
+                                                                          "name": "request_approval_create",
+                                                                          "displayName": "Post recap & request approval",
+                                                                          "valid": true,
+                                                                          "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                          "settings": {
+                                                                            "pieceName": "@activepieces/piece-slack",
+                                                                            "pieceVersion": "0.17.8",
+                                                                            "actionName": "request_approval_message",
+                                                                            "propertySettings": {},
+                                                                            "input": {
+                                                                              "auth": "{{connections.slack}}",
+                                                                              "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
+                                                                              "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_create.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (also saved to your Gmail Drafts):\nSubject: {{parse_draft_create.output.emailSubject}}\n\n{{parse_draft_create.output.emailBody}}\n\nApprove to send — Reject to keep the draft for edits. Nothing sends without your tap."
+                                                                            }
+                                                                          },
+                                                                          "nextAction": {
+                                                                            "type": "ROUTER",
+                                                                            "name": "approval_gate_create",
+                                                                            "displayName": "Approval gate",
+                                                                            "valid": true,
+                                                                            "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                            "settings": {
+                                                                              "branches": [
+                                                                                {
+                                                                                  "conditions": [
+                                                                                    [
+                                                                                      {
+                                                                                        "firstValue": "{{request_approval_create.output.approved}}",
+                                                                                        "secondValue": "true",
+                                                                                        "operator": "TEXT_EXACTLY_MATCHES"
+                                                                                      }
+                                                                                    ]
+                                                                                  ],
+                                                                                  "branchType": "CONDITION",
+                                                                                  "branchName": "approved"
+                                                                                },
+                                                                                {
+                                                                                  "branchType": "FALLBACK",
+                                                                                  "branchName": "rejected"
+                                                                                }
+                                                                              ],
+                                                                              "executionType": "EXECUTE_FIRST_MATCH"
+                                                                            },
+                                                                            "children": [
+                                                                              {
+                                                                                "type": "PIECE",
+                                                                                "name": "send_draft_create",
+                                                                                "displayName": "Send approved follow-up",
+                                                                                "valid": true,
+                                                                                "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                                "settings": {
+                                                                                  "pieceName": "@activepieces/piece-gmail",
+                                                                                  "pieceVersion": "0.12.10",
+                                                                                  "actionName": "gmail_send_draft",
+                                                                                  "propertySettings": {},
+                                                                                  "input": {
+                                                                                    "auth": "{{connections.gmail}}",
+                                                                                    "draft_id": "{{create_draft_create.output.id}}"
+                                                                                  }
+                                                                                },
+                                                                                "nextAction": {
+                                                                                  "type": "PIECE",
+                                                                                  "name": "log_processed_sent_create",
+                                                                                  "displayName": "Mark processed (sent)",
+                                                                                  "valid": true,
+                                                                                  "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                                  "settings": {
+                                                                                    "pieceName": "@activepieces/piece-googleSheets",
+                                                                                    "pieceVersion": "0.16.7",
+                                                                                    "actionName": "sheets_add_row",
+                                                                                    "propertySettings": {},
+                                                                                    "input": {
+                                                                                      "auth": "{{connections.googleSheets}}",
+                                                                                      "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                                      "sheet_id": 4,
+                                                                                      "first_row_headers": true,
+                                                                                      "as_string": false,
+                                                                                      "values": {
+                                                                                        "A": "{{pick_candidate.output.fingerprint}}",
+                                                                                        "B": "{{pick_candidate.output.candidate.source}}",
+                                                                                        "C": "{{pipeline_ctx_create.output.nowIso}}",
+                                                                                        "D": "logged",
+                                                                                        "E": "{{pipeline_ctx_create.output.dealRef}}",
+                                                                                        "F": "sent"
+                                                                                      }
+                                                                                    }
+                                                                                  },
+                                                                                  "nextAction": null
+                                                                                }
+                                                                              },
+                                                                              {
+                                                                                "type": "PIECE",
+                                                                                "name": "log_processed_rejected_create",
+                                                                                "displayName": "Mark processed (rejected)",
+                                                                                "valid": true,
+                                                                                "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                                "settings": {
+                                                                                  "pieceName": "@activepieces/piece-googleSheets",
+                                                                                  "pieceVersion": "0.16.7",
+                                                                                  "actionName": "sheets_add_row",
+                                                                                  "propertySettings": {},
+                                                                                  "input": {
+                                                                                    "auth": "{{connections.googleSheets}}",
+                                                                                    "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                                    "sheet_id": 4,
+                                                                                    "first_row_headers": true,
+                                                                                    "as_string": false,
+                                                                                    "values": {
+                                                                                      "A": "{{pick_candidate.output.fingerprint}}",
+                                                                                      "B": "{{pick_candidate.output.candidate.source}}",
+                                                                                      "C": "{{pipeline_ctx_create.output.nowIso}}",
+                                                                                      "D": "logged",
+                                                                                      "E": "{{pipeline_ctx_create.output.dealRef}}",
+                                                                                      "F": "rejected"
+                                                                                    }
+                                                                                  }
+                                                                                },
+                                                                                "nextAction": null
+                                                                              }
+                                                                            ],
+                                                                            "nextAction": null
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  "firstLoopAction": {
+                                                                    "type": "PIECE",
+                                                                    "name": "log_task_row_create",
+                                                                    "displayName": "Log task",
+                                                                    "valid": true,
+                                                                    "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                    "settings": {
+                                                                      "pieceName": "@activepieces/piece-googleSheets",
+                                                                      "pieceVersion": "0.16.7",
+                                                                      "actionName": "sheets_add_row",
+                                                                      "propertySettings": {},
+                                                                      "input": {
+                                                                        "auth": "{{connections.googleSheets}}",
+                                                                        "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                        "sheet_id": 3,
+                                                                        "first_row_headers": true,
+                                                                        "as_string": false,
+                                                                        "values": {
+                                                                          "A": "{{pipeline_ctx_create.output.noteId}}-t{{loop_tasks_create.output.index}}",
+                                                                          "B": "{{pipeline_ctx_create.output.dealRef}}",
+                                                                          "C": "{{loop_tasks_create.output.item.task}}",
+                                                                          "D": "{{loop_tasks_create.output.item.owner}}",
+                                                                          "E": "{{loop_tasks_create.output.item.dueDate}}",
+                                                                          "F": "open",
+                                                                          "G": "{{pick_candidate.output.candidate.id}}"
+                                                                        }
+                                                                      }
+                                                                    },
+                                                                    "nextAction": null
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        },
+                                                        {
+                                                          "type": "CODE",
+                                                          "name": "pipeline_ctx_skip",
+                                                          "displayName": "Pipeline context",
+                                                          "valid": true,
+                                                          "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                          "settings": {
+                                                            "sourceCode": {
+                                                              "packageJson": "{}",
+                                                              "code": "export const code = async (params) => {\n  return {\n    noteId: 'note_' + Date.now().toString(36),\n    dealRef: String(params.dealRef ?? ''),\n    nowIso: new Date().toISOString(),\n  };\n};"
+                                                            },
+                                                            "input": {
+                                                              "dealRef": "{{parse_extraction.output.suggestedAccount}}"
+                                                            }
+                                                          },
+                                                          "nextAction": {
+                                                            "type": "PIECE",
+                                                            "name": "log_call_notes_skip",
+                                                            "displayName": "Log call notes",
+                                                            "valid": true,
+                                                            "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                            "settings": {
+                                                              "pieceName": "@activepieces/piece-googleSheets",
+                                                              "pieceVersion": "0.16.7",
+                                                              "actionName": "sheets_add_row",
+                                                              "propertySettings": {},
+                                                              "input": {
+                                                                "auth": "{{connections.googleSheets}}",
+                                                                "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                "sheet_id": 2,
+                                                                "first_row_headers": true,
+                                                                "as_string": false,
+                                                                "values": {
+                                                                  "A": "{{pipeline_ctx_skip.output.noteId}}",
+                                                                  "B": "{{pipeline_ctx_skip.output.dealRef}}",
+                                                                  "C": "{{parse_extraction.output.externalAttendee}}",
+                                                                  "D": "{{pick_candidate.output.candidate.date}}",
+                                                                  "E": "{{parse_extraction.output.summary}}",
+                                                                  "F": "{{parse_extraction.output.objections}}",
+                                                                  "G": "{{parse_extraction.output.commitments}}",
+                                                                  "H": "{{pick_candidate.output.candidate.source}}",
+                                                                  "I": "{{pick_candidate.output.candidate.link}}"
+                                                                }
+                                                              }
+                                                            },
+                                                            "nextAction": {
+                                                              "type": "LOOP_ON_ITEMS",
+                                                              "name": "loop_tasks_skip",
+                                                              "displayName": "Log each next step",
+                                                              "valid": true,
+                                                              "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                              "settings": {
+                                                                "items": "{{parse_extraction.output.tasks}}"
+                                                              },
+                                                              "nextAction": {
+                                                                "type": "PIECE",
+                                                                "name": "draft_followup_skip",
+                                                                "displayName": "Draft follow-up email",
+                                                                "valid": true,
+                                                                "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                "settings": {
+                                                                  "pieceName": "@activepieces/piece-openai",
+                                                                  "pieceVersion": "0.10.3",
+                                                                  "actionName": "ask_chatgpt",
+                                                                  "propertySettings": {},
+                                                                  "input": {
+                                                                    "auth": "{{connections.openai}}",
+                                                                    "model": "gpt-4o-mini",
+                                                                    "prompt": "Write a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
+                                                                    "temperature": 0.7,
+                                                                    "maxTokens": 800,
+                                                                    "topP": 1,
+                                                                    "roles": [
+                                                                      {
+                                                                        "role": "system",
+                                                                        "content": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs)."
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                },
+                                                                "nextAction": {
+                                                                  "type": "CODE",
+                                                                  "name": "parse_draft_skip",
+                                                                  "displayName": "Parse draft",
+                                                                  "valid": true,
+                                                                  "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                  "settings": {
+                                                                    "sourceCode": {
+                                                                      "packageJson": "{}",
+                                                                      "code": "export const code = async (params) => {\n  const raw = String(params.draft_followup?.choices?.[0]?.message?.content ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = {};\n  try {\n    p = JSON.parse(raw);\n  } catch {\n    p = { email_subject: '', email_body: raw };\n  }\n  return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };\n};"
+                                                                    },
+                                                                    "input": {
+                                                                      "draft_followup": "{{draft_followup_skip.output}}"
+                                                                    }
+                                                                  },
+                                                                  "nextAction": {
+                                                                    "type": "PIECE",
+                                                                    "name": "create_draft_skip",
+                                                                    "displayName": "Save draft to Gmail",
+                                                                    "valid": true,
+                                                                    "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                    "settings": {
+                                                                      "pieceName": "@activepieces/piece-gmail",
+                                                                      "pieceVersion": "0.12.10",
+                                                                      "actionName": "gmail_create_draft",
+                                                                      "propertySettings": {},
+                                                                      "input": {
+                                                                        "auth": "{{connections.gmail}}",
+                                                                        "receiver": [
+                                                                          "{{parse_extraction.output.externalAttendee}}"
+                                                                        ],
+                                                                        "subject": "{{parse_draft_skip.output.emailSubject}}",
+                                                                        "body_type": "plain_text",
+                                                                        "body": "{{parse_draft_skip.output.emailBody}}"
+                                                                      }
+                                                                    },
+                                                                    "nextAction": {
+                                                                      "type": "PIECE",
+                                                                      "name": "request_approval_skip",
+                                                                      "displayName": "Post recap & request approval",
+                                                                      "valid": true,
+                                                                      "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                      "settings": {
+                                                                        "pieceName": "@activepieces/piece-slack",
+                                                                        "pieceVersion": "0.17.8",
+                                                                        "actionName": "request_approval_message",
+                                                                        "propertySettings": {},
+                                                                        "input": {
+                                                                          "auth": "{{connections.slack}}",
+                                                                          "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
+                                                                          "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_skip.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (also saved to your Gmail Drafts):\nSubject: {{parse_draft_skip.output.emailSubject}}\n\n{{parse_draft_skip.output.emailBody}}\n\nApprove to send — Reject to keep the draft for edits. Nothing sends without your tap."
+                                                                        }
+                                                                      },
+                                                                      "nextAction": {
+                                                                        "type": "ROUTER",
+                                                                        "name": "approval_gate_skip",
+                                                                        "displayName": "Approval gate",
+                                                                        "valid": true,
+                                                                        "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                        "settings": {
+                                                                          "branches": [
+                                                                            {
+                                                                              "conditions": [
+                                                                                [
+                                                                                  {
+                                                                                    "firstValue": "{{request_approval_skip.output.approved}}",
+                                                                                    "secondValue": "true",
+                                                                                    "operator": "TEXT_EXACTLY_MATCHES"
+                                                                                  }
+                                                                                ]
+                                                                              ],
+                                                                              "branchType": "CONDITION",
+                                                                              "branchName": "approved"
+                                                                            },
+                                                                            {
+                                                                              "branchType": "FALLBACK",
+                                                                              "branchName": "rejected"
+                                                                            }
+                                                                          ],
+                                                                          "executionType": "EXECUTE_FIRST_MATCH"
+                                                                        },
+                                                                        "children": [
+                                                                          {
+                                                                            "type": "PIECE",
+                                                                            "name": "send_draft_skip",
+                                                                            "displayName": "Send approved follow-up",
+                                                                            "valid": true,
+                                                                            "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                            "settings": {
+                                                                              "pieceName": "@activepieces/piece-gmail",
+                                                                              "pieceVersion": "0.12.10",
+                                                                              "actionName": "gmail_send_draft",
+                                                                              "propertySettings": {},
+                                                                              "input": {
+                                                                                "auth": "{{connections.gmail}}",
+                                                                                "draft_id": "{{create_draft_skip.output.id}}"
+                                                                              }
+                                                                            },
+                                                                            "nextAction": {
+                                                                              "type": "PIECE",
+                                                                              "name": "log_processed_sent_skip",
+                                                                              "displayName": "Mark processed (sent)",
+                                                                              "valid": true,
+                                                                              "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                              "settings": {
+                                                                                "pieceName": "@activepieces/piece-googleSheets",
+                                                                                "pieceVersion": "0.16.7",
+                                                                                "actionName": "sheets_add_row",
+                                                                                "propertySettings": {},
+                                                                                "input": {
+                                                                                  "auth": "{{connections.googleSheets}}",
+                                                                                  "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                                  "sheet_id": 4,
+                                                                                  "first_row_headers": true,
+                                                                                  "as_string": false,
+                                                                                  "values": {
+                                                                                    "A": "{{pick_candidate.output.fingerprint}}",
+                                                                                    "B": "{{pick_candidate.output.candidate.source}}",
+                                                                                    "C": "{{pipeline_ctx_skip.output.nowIso}}",
+                                                                                    "D": "logged",
+                                                                                    "E": "{{pipeline_ctx_skip.output.dealRef}}",
+                                                                                    "F": "sent"
+                                                                                  }
+                                                                                }
+                                                                              },
+                                                                              "nextAction": null
+                                                                            }
+                                                                          },
+                                                                          {
+                                                                            "type": "PIECE",
+                                                                            "name": "log_processed_rejected_skip",
+                                                                            "displayName": "Mark processed (rejected)",
+                                                                            "valid": true,
+                                                                            "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                            "settings": {
+                                                                              "pieceName": "@activepieces/piece-googleSheets",
+                                                                              "pieceVersion": "0.16.7",
+                                                                              "actionName": "sheets_add_row",
+                                                                              "propertySettings": {},
+                                                                              "input": {
+                                                                                "auth": "{{connections.googleSheets}}",
+                                                                                "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                                "sheet_id": 4,
+                                                                                "first_row_headers": true,
+                                                                                "as_string": false,
+                                                                                "values": {
+                                                                                  "A": "{{pick_candidate.output.fingerprint}}",
+                                                                                  "B": "{{pick_candidate.output.candidate.source}}",
+                                                                                  "C": "{{pipeline_ctx_skip.output.nowIso}}",
+                                                                                  "D": "logged",
+                                                                                  "E": "{{pipeline_ctx_skip.output.dealRef}}",
+                                                                                  "F": "rejected"
+                                                                                }
+                                                                              }
+                                                                            },
+                                                                            "nextAction": null
+                                                                          }
+                                                                        ],
+                                                                        "nextAction": null
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              },
+                                                              "firstLoopAction": {
+                                                                "type": "PIECE",
+                                                                "name": "log_task_row_skip",
+                                                                "displayName": "Log task",
+                                                                "valid": true,
+                                                                "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
+                                                                "settings": {
+                                                                  "pieceName": "@activepieces/piece-googleSheets",
+                                                                  "pieceVersion": "0.16.7",
+                                                                  "actionName": "sheets_add_row",
+                                                                  "propertySettings": {},
+                                                                  "input": {
+                                                                    "auth": "{{connections.googleSheets}}",
+                                                                    "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                    "sheet_id": 3,
+                                                                    "first_row_headers": true,
+                                                                    "as_string": false,
+                                                                    "values": {
+                                                                      "A": "{{pipeline_ctx_skip.output.noteId}}-t{{loop_tasks_skip.output.index}}",
+                                                                      "B": "{{pipeline_ctx_skip.output.dealRef}}",
+                                                                      "C": "{{loop_tasks_skip.output.item.task}}",
+                                                                      "D": "{{loop_tasks_skip.output.item.owner}}",
+                                                                      "E": "{{loop_tasks_skip.output.item.dueDate}}",
+                                                                      "F": "open",
+                                                                      "G": "{{pick_candidate.output.candidate.id}}"
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "nextAction": null
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      ],
+                                                      "nextAction": null
+                                                    }
+                                                  }
+                                                ],
+                                                "nextAction": null
+                                              }
+                                            }
+                                          }
+                                        ],
+                                        "nextAction": null
+                                      }
+                                    }
+                                  }
+                                ],
+                                "nextAction": null
+                              }
+                            }
+                          ],
+                          "nextAction": null
+                        }
+                      }
+                    }
+                  ],
+                  "nextAction": null
+                }
+              }
+            }
+          }
+        }
+      },
+      "valid": true,
+      "schemaVersion": "22",
+      "state": "DRAFT",
+      "connectionIds": [],
+      "agentIds": [],
+      "notes": [],
+      "created": "2026-08-12T00:00:00.000Z",
+      "updated": "2026-08-12T00:00:00.000Z"
+    }
+  ],
+  "status": "PUBLISHED"
+}

@@ -7,9 +7,12 @@ platform's upload box actually wants.
 
 | File | What it is |
 |---|---|
-| [`agent.json`](../agent.json) | The flow export. Upload this, or open it and paste the contents into the platform's "Paste JSON" tab. |
-| [`build-agent.mjs`](./build-agent.mjs) | Deterministic generator for `agent.json` (regenerate with `node activepieces/build-agent.mjs`). |
+| [`agent.json`](../agent.json) | The flow export (single `FLOW_VERSION`). Upload this, or paste its contents into the platform's "Paste JSON" tab. |
+| [`flows.json`](../flows.json) | The same flow in **template form** — a `SharedTemplate` with a `flows` list (name, description, pieces, `flows: [...]`). Use this when the upload box expects a flow **template / "flows" list** rather than a raw flow export. |
+| [`build-agent.mjs`](./build-agent.mjs) | Deterministic generator for both files (regenerate with `node activepieces/build-agent.mjs`). |
 | [`test-agent.mjs`](./test-agent.mjs) | Dependency-free test harness that runs every code step in `agent.json` against realistic inputs and asserts the PRD guardrails (see "Testing"). |
+
+**Which file to upload?** If the box accepts a single flow export, use `agent.json`. If it expects a template or a "flows" list, use `flows.json`. Both are generated from the same source and validated against `@activepieces/shared` schemas (`FlowVersion`/`SharedTemplate`).
 
 Every identifier inside `agent.json` — piece names, versions, action/trigger
 names, property keys, output paths, the `FLOW_VERSION` schema — was verified

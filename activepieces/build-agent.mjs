@@ -44,6 +44,9 @@ const PIECES = {
   openai: '0.10.3',
 }
 
+// Piece names in the order the flow uses them (for the template's `pieces` list).
+const PIECES_PIECE_NAMES = Object.keys(PIECES).map((k) => `@activepieces/piece-${k}`)
+
 // Placeholders the importer must replace once (see activepieces/README.md).
 // Every placeholder starts with REPLACE_ so it is easy to find.
 const SPREADSHEET_ID = 'REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID'
@@ -906,13 +909,33 @@ function dealGate() {
 }
 
 // ---------------------------------------------------------------------------
-// Write agent.json
+// Write agent.json + flows.json (SharedTemplate with the flows list)
 // ---------------------------------------------------------------------------
 
 const flow = buildFlow()
-const json = JSON.stringify(flow, null, 2) + '\n'
 const outPath = join(ROOT, 'agent.json')
-writeFileSync(outPath, json, 'utf8')
+writeFileSync(outPath, JSON.stringify(flow, null, 2) + '\n', 'utf8')
+
+// The platform also accepts the template shape: a "flows" list (SharedTemplate
+// in @activepieces/shared — the same container ActivePieces' own template
+// export endpoint produces: { name, type, summary, description, tags, blogUrl,
+// metadata, author, categories, pieces, flows, status }).
+const template = {
+  name: FLOW_DISPLAY_NAME,
+  type: 'SHARED',
+  summary: 'Scheduled sweep of Gmail (and Drive) transcript sources, fingerprint dedup, AI extraction with guardrails, and a Slack one-tap approval that gates the follow-up email.',
+  description: flow.description,
+  tags: [],
+  blogUrl: '',
+  metadata: { externalId: 'sales-call-logger-followup-drafter' },
+  author: '',
+  categories: [],
+  pieces: Object.values(PIECES_PIECE_NAMES),
+  flows: [flow],
+  status: 'PUBLISHED',
+}
+const flowsPath = join(ROOT, 'flows.json')
+writeFileSync(flowsPath, JSON.stringify(template, null, 2) + '\n', 'utf8')
 
 // Count steps for the console summary (walk the whole tree, de-dup by object)
 function countSteps(root) {
@@ -929,6 +952,7 @@ function countSteps(root) {
 }
 
 console.log(`Wrote ${outPath}`)
+console.log(`Wrote ${flowsPath} (SharedTemplate with flows list)`)
 console.log(`Flow: ${flow.displayName} (schemaVersion ${SCHEMA_VERSION})`)
 console.log(`Total steps incl. trigger: ${countSteps(flow.trigger)}`)
 console.log(`Pieces: ${Object.entries(PIECES).map(([k, v]) => `${k}@${v}`).join(', ')}`)
