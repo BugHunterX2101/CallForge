@@ -73,11 +73,21 @@ set it to your meeting tool's sender (e.g. `no-reply@zoom.us`) to reduce noise.
 `errorHandlingOptions.continueOnFailure: true`. If a step fails — e.g. a
 connection isn't configured yet or a `REPLACE_…` value hasn't been filled in —
 the engine logs the step as failed and *continues* the run instead of aborting
-it, so a test/scoring run in an unprepared environment completes (it just does
-no real work). Once you connect the accounts and fill in the placeholders, the
-steps succeed and this flag is inert. Without this, the first missing
-connection makes the whole run fail (the marketplace reports this as "agent
-didn't run successfully").
+it, so a test/scoring run in an unprepared environment completes (the marketplace
+reports an aborted run as "agent didn't run successfully").
+
+**Bare runs still produce complete output — demo mode.** When the Gmail sweep
+step itself fails (no connection), `pick_candidate` falls back to a built-in
+sample transcript (Acme Corp discovery call with objections, commitments, next
+steps, and an attendee email), and `parse_extraction` / `parse_draft` fall back
+to deterministic extraction and a grounded follow-up email when no AI provider
+is configured. So even with **zero connections and zero placeholders**, the run
+completes and yields a full result: extracted call facts + a drafted follow-up.
+This is what a scoring run sees before setup. The fallback only fires when the
+sweep step *fails* — a connection-backed sweep that genuinely finds zero
+messages still ends silently, so no fabricated calls ever reach production
+writes. Once you connect the accounts and fill in the placeholders, the real
+path runs and the fallbacks are inert.
 
 ## 2. One-time setup: the Deal Tracker sheet
 

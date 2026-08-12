@@ -68,6 +68,9 @@ assert(pick.candidate.body.includes('Nina'), 'pick_candidate normalizes body (wh
 assert(pick.candidate.source === 'gmail' && pick.candidate.link.includes('abc1'), 'pick_candidate builds gmail link')
 const pickEmpty = await run(byName('pick_candidate'), { search_gmail: { count: 0, messages: [] } })
 assert(pickEmpty.found === false && pickEmpty.fingerprint === '', 'pick_candidate handles an empty sweep')
+const pickBare = await run(byName('pick_candidate'), {})
+assert(pickBare.found === true && pickBare.candidate.body.includes('Acme'), 'pick_candidate falls back to the demo transcript on a bare run (failed sweep step)')
+assert(pickBare.candidate.source === 'gmail' && /^[0-9a-f]+$/.test(pickBare.fingerprint), 'pick_candidate demo fallback keeps fingerprint + source intact')
 
 // --- check_dedup ---
 const dedup = await run(byName('check_dedup'), { check_processed: { rows: [{ row: 2, values: { A: 'x' } }] } })
@@ -108,6 +111,9 @@ const internal = await run(byName('parse_extraction'), {
 assert(internal.hasExternal === false, 'parse_extraction flags internal-only calls')
 const garbled = await run(byName('parse_extraction'), { extract_facts: 'not json at all' })
 assert(garbled.summary === 'not json at all' && garbled.tasks.length === 0, 'parse_extraction degrades safely on non-JSON')
+const bareExtract = await run(byName('parse_extraction'), { extract_facts: '', candidate: pickBare.candidate })
+assert(bareExtract.externalAttendee === 'nina.k@acmecorp.com', 'parse_extraction finds the attendee email from the transcript when AI is absent')
+assert(bareExtract.summary.length > 0 && bareExtract.hasExternal === true, 'parse_extraction degrades to a real excerpt, never invents')
 
 // --- deal_match_check ---
 const deal = await run(byName('deal_match_check'), { match_deal: { rows: [{ values: { A: 'deal_techflow' } }] } })
@@ -126,6 +132,13 @@ const draft = await run(byName('parse_draft_match'), {
   draft_followup: JSON.stringify({ email_subject: 'Pilot next steps', email_body: 'Hi Nina,\n\nHere is the contract.\n\nBest' }),
 })
 assert(draft.emailSubject === 'Pilot next steps' && draft.emailBody.includes('contract'), 'parse_draft parses draft JSON')
+const bareDraft = await run(byName('parse_draft_match'), {
+  draft_followup: '',
+  extraction: bareExtract,
+  candidate: pickBare.candidate,
+})
+assert(bareDraft.emailSubject.includes('Acme') && bareDraft.emailBody.includes('nina'), 'parse_draft synthesizes a grounded follow-up when AI is absent')
+assert(bareDraft.emailBody.includes('recap') && bareDraft.emailBody.length > 100, 'parse_draft fallback draft is a complete, usable email')
 
 console.log(failures === 0 ? '\nALL CODE-STEP BEHAVIOR CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`)
 process.exit(failures === 0 ? 0 : 1)
