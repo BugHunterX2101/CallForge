@@ -56,6 +56,32 @@ const DRIVE_FOLDER_ID = 'REPLACE_WITH_TRANSCRIPT_FOLDER_ID'
 const SLACK_CHANNEL_ID = 'REPLACE_WITH_SLACK_CHANNEL_ID'
 const OPENAI_MODEL = 'gpt-4o-mini'
 
+// Diagnostic mode: NO_AI=1 swaps the two AI (askAi) steps for deterministic
+// code steps so the flow can be tested without the AI piece — used to isolate
+// whether the marketplace prepare 500 is caused by the AI piece or by the
+// flow structure itself (routers/loops/connections).
+const NO_AI = process.env.NO_AI === '1'
+
+const CODE_MOCK_EXTRACT = `export const code = async (params) => {
+  const body = String(params.candidate?.body ?? '').slice(0, 3000);
+  return JSON.stringify({
+    summary: 'Mock extraction — ' + body.slice(0, 120),
+    objections: ['mock objection'],
+    commitments: ['mock commitment'],
+    nextSteps: [{ task: 'mock follow-up', owner: 'REP', dueDate: 'Not specified' }],
+    stageSignal: null,
+    externalAttendee: 'mock@example.com',
+    suggestedAccount: 'Mock Company',
+  });
+};`
+
+const CODE_MOCK_DRAFT = `export const code = async (params) => {
+  return JSON.stringify({
+    email_subject: 'Mock follow-up subject',
+    email_body: 'Mock follow-up body based on the call.',
+  });
+};`
+
 // Numeric sheet ids for the Deal Tracker tabs, created in this order:
 // Deals, Contacts, Call Notes, Tasks, _ProcessedCalls  (PRD §8)
 const TABS = { deals: 0, contacts: 1, callNotes: 2, tasks: 3, processed: 4 }
@@ -478,19 +504,26 @@ function pipeline(suffix, dealRefBinding) {
   })
   loopTasks.firstLoopAction = logTaskRow
 
-  const draftFollowup = pieceAction({
-    name: S('draft_followup'),
-    displayName: 'Draft follow-up email (AI)',
-    piece: 'ai',
-    actionName: 'askAi',
-    input: {
-      provider: 'openai',
-      model: OPENAI_MODEL,
-      prompt: DRAFT_PROMPT,
-      creativity: 70,
-      maxOutputTokens: 1000,
-    },
-  })
+  const draftFollowup = NO_AI
+    ? codeAction({
+        name: S('draft_followup'),
+        displayName: 'Draft follow-up email (mock, no AI)',
+        code: CODE_MOCK_DRAFT,
+        input: { candidate: '{{pick_candidate.output.candidate}}' },
+      })
+    : pieceAction({
+        name: S('draft_followup'),
+        displayName: 'Draft follow-up email (AI)',
+        piece: 'ai',
+        actionName: 'askAi',
+        input: {
+          provider: 'openai',
+          model: OPENAI_MODEL,
+          prompt: DRAFT_PROMPT,
+          creativity: 70,
+          maxOutputTokens: 1000,
+        },
+      })
 
   const parseDraft = codeAction({
     name: S('parse_draft'),
@@ -764,19 +797,26 @@ function qualityGate() {
     F: '',
   })
 
-  const extractFacts = pieceAction({
-    name: 'extract_facts',
-    displayName: 'Extract call facts (AI)',
-    piece: 'ai',
-    actionName: 'askAi',
-    input: {
-      provider: 'openai',
-      model: OPENAI_MODEL,
-      prompt: EXTRACTION_PROMPT,
-      creativity: 0,
-      maxOutputTokens: 2500,
-    },
-  })
+  const extractFacts = NO_AI
+    ? codeAction({
+        name: 'extract_facts',
+        displayName: 'Extract call facts (mock, no AI)',
+        code: CODE_MOCK_EXTRACT,
+        input: { candidate: '{{pick_candidate.output.candidate}}' },
+      })
+    : pieceAction({
+        name: 'extract_facts',
+        displayName: 'Extract call facts (AI)',
+        piece: 'ai',
+        actionName: 'askAi',
+        input: {
+          provider: 'openai',
+          model: OPENAI_MODEL,
+          prompt: EXTRACTION_PROMPT,
+          creativity: 0,
+          maxOutputTokens: 2500,
+        },
+      })
 
   const parseExtraction = codeAction({
     name: 'parse_extraction',
@@ -922,6 +962,10 @@ const flow = buildFlow()
 const outPath = join(ROOT, 'agent.json')
 writeFileSync(outPath, JSON.stringify(flow, null, 2) + '\n', 'utf8')
 
+// In NO_AI mode the single-flow export is also written under a distinct name
+// so the diagnostic file can't be mistaken for the real submission.
+const flowsPath = join(ROOT, NO_AI ? 'flows-noai.json' : 'flows.json')
+
 // The platform also accepts the template shape: a "flows" list (SharedTemplate
 // in @activepieces/shared — the same container ActivePieces' own template
 // export endpoint produces: { name, type, summary, description, tags, blogUrl,
@@ -941,11 +985,10 @@ const template = {
   metadata: { externalId: 'sales-call-logger-followup-drafter' },
   author: '',
   categories: [],
-  pieces: Object.values(PIECES_PIECE_NAMES),
+  pieces: Object.values(PIECES_PIECE_NAMES).filter((n) => !(NO_AI && n === '@activepieces/piece-ai')),
   flows: [templateFlow],
   status: 'PUBLISHED',
 }
-const flowsPath = join(ROOT, 'flows.json')
 writeFileSync(flowsPath, JSON.stringify(template, null, 2) + '\n', 'utf8')
 
 // Count steps for the console summary (walk the whole tree, de-dup by object)
