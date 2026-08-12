@@ -31,7 +31,12 @@
           "packageJson": "{}",
           "code": "export const code = async () => {\n  const sinceIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();\n  const nowIso = new Date().toISOString();\n  return { sinceIso, nowIso };\n};"
         },
-        "input": {}
+        "input": {},
+        "errorHandlingOptions": {
+          "continueOnFailure": {
+            "value": true
+          }
+        }
       },
       "nextAction": {
         "type": "PIECE",
@@ -50,6 +55,11 @@
             "after_date": "{{sweep_window.output.sinceIso}}",
             "max_results": 10,
             "include_spam_trash": false
+          },
+          "errorHandlingOptions": {
+            "continueOnFailure": {
+              "value": true
+            }
           }
         },
         "nextAction": {
@@ -70,6 +80,11 @@
               "depth_level": 1,
               "download_files": false,
               "include_team_drives": false
+            },
+            "errorHandlingOptions": {
+              "continueOnFailure": {
+                "value": true
+              }
             }
           },
           "nextAction": {
@@ -85,6 +100,11 @@
               },
               "input": {
                 "search_gmail": "{{search_gmail.output.results}}"
+              },
+              "errorHandlingOptions": {
+                "continueOnFailure": {
+                  "value": true
+                }
               }
             },
             "nextAction": {
@@ -136,6 +156,11 @@
                       "search_value": "{{pick_candidate.output.fingerprint}}",
                       "match_case": true,
                       "number_of_rows": 1
+                    },
+                    "errorHandlingOptions": {
+                      "continueOnFailure": {
+                        "value": true
+                      }
                     }
                   },
                   "nextAction": {
@@ -151,6 +176,11 @@
                       },
                       "input": {
                         "check_processed": "{{check_processed.output}}"
+                      },
+                      "errorHandlingOptions": {
+                        "continueOnFailure": {
+                          "value": true
+                        }
                       }
                     },
                     "nextAction": {
@@ -196,6 +226,11 @@
                             },
                             "input": {
                               "candidate": "{{pick_candidate.output.candidate}}"
+                            },
+                            "errorHandlingOptions": {
+                              "continueOnFailure": {
+                                "value": true
+                              }
                             }
                           },
                           "nextAction": {
@@ -242,6 +277,11 @@
                                     "auth": "{{connections['slack']}}",
                                     "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                     "text": ":warning: *Call transcript could not be processed*\nSource: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.subject}}\nDate: {{pick_candidate.output.candidate.date}}\nThe transcript was empty or unreadable, so nothing was logged and no follow-up was drafted. Please handle this call manually:\n{{pick_candidate.output.candidate.link}}"
+                                  },
+                                  "errorHandlingOptions": {
+                                    "continueOnFailure": {
+                                      "value": true
+                                    }
                                   }
                                 },
                                 "nextAction": {
@@ -269,24 +309,38 @@
                                         "E": "",
                                         "F": ""
                                       }
+                                    },
+                                    "errorHandlingOptions": {
+                                      "continueOnFailure": {
+                                        "value": true
+                                      }
                                     }
                                   },
                                   "nextAction": null
                                 }
                               },
                               {
-                                "type": "CODE",
+                                "type": "PIECE",
                                 "name": "extract_facts",
-                                "displayName": "Extract call facts (mock, no AI)",
+                                "displayName": "Extract call facts (AI)",
                                 "valid": true,
                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                 "settings": {
-                                  "sourceCode": {
-                                    "packageJson": "{}",
-                                    "code": "export const code = async (params) => {\n  const body = String(params.candidate?.body ?? '').slice(0, 3000);\n  return JSON.stringify({\n    summary: 'Mock extraction — ' + body.slice(0, 120),\n    objections: ['mock objection'],\n    commitments: ['mock commitment'],\n    nextSteps: [{ task: 'mock follow-up', owner: 'REP', dueDate: 'Not specified' }],\n    stageSignal: null,\n    externalAttendee: 'mock@example.com',\n    suggestedAccount: 'Mock Company',\n  });\n};"
-                                  },
+                                  "pieceName": "@activepieces/piece-ai",
+                                  "pieceVersion": "0.6.0",
+                                  "actionName": "askAi",
+                                  "propertySettings": {},
                                   "input": {
-                                    "candidate": "{{pick_candidate.output.candidate}}"
+                                    "provider": "openai",
+                                    "model": "gpt-4o-mini",
+                                    "prompt": "You are a rigorous sales-call analyst. You extract facts ONLY from the transcript provided. Never invent, soften, or infer beyond what was said.\n- Objections and commitments must be quoted verbatim in the caller's language.\n- A due date that is not stated or reasonably inferable is recorded as \"Not specified\" — never guessed.\n- A stage change signal only exists when someone explicitly asks to move forward, requests a contract, etc. Otherwise stageSignal is null.\n- If every participant is internal (no external customer email), externalAttendee is an empty string.\n- suggestedAccount is the customer's company name as stated in the call, or \"\" if unknown.\n\nAnalyze the sales call transcript below and return ONLY valid JSON with this exact shape:\n{\n  \"summary\": \"string — 3-6 sentences covering what was discussed and decided\",\n  \"objections\": [\"string — verbatim objections raised by the customer\"],\n  \"commitments\": [\"string — verbatim promises made on either side\"],\n  \"nextSteps\": [{\"task\": \"string\", \"owner\": \"REP | CLIENT | OTHER\", \"dueDate\": \"YYYY-MM-DD or Not specified\"}],\n  \"stageSignal\": null | {\"signal\": \"exact quote from the transcript\", \"newStage\": \"string\"},\n  \"externalAttendee\": \"customer email if any, else empty string\",\n  \"suggestedAccount\": \"customer company name if stated, else empty string\"\n}\n\nRules:\n- Quote objections and commitments verbatim — never paraphrase or soften.\n- Never invent a due date. Use \"Not specified\" when none is stated or reasonably inferable.\n- Only set stageSignal when there is an explicit, quotable signal to move the deal forward.\n- nextSteps: capture every stated or clearly implied next step; leave owner/dueDate conservative.\n\nTranscript:\n{{pick_candidate.output.candidate.body}}",
+                                    "creativity": 0,
+                                    "maxOutputTokens": 2500
+                                  },
+                                  "errorHandlingOptions": {
+                                    "continueOnFailure": {
+                                      "value": true
+                                    }
                                   }
                                 },
                                 "nextAction": {
@@ -302,6 +356,11 @@
                                     },
                                     "input": {
                                       "extract_facts": "{{extract_facts.output}}"
+                                    },
+                                    "errorHandlingOptions": {
+                                      "continueOnFailure": {
+                                        "value": true
+                                      }
                                     }
                                   },
                                   "nextAction": {
@@ -358,6 +417,11 @@
                                               "E": "",
                                               "F": ""
                                             }
+                                          },
+                                          "errorHandlingOptions": {
+                                            "continueOnFailure": {
+                                              "value": true
+                                            }
                                           }
                                         },
                                         "nextAction": null
@@ -381,6 +445,11 @@
                                             "search_value": "{{parse_extraction.output.suggestedAccount}}",
                                             "match_case": false,
                                             "number_of_rows": 1
+                                          },
+                                          "errorHandlingOptions": {
+                                            "continueOnFailure": {
+                                              "value": true
+                                            }
                                           }
                                         },
                                         "nextAction": {
@@ -396,6 +465,11 @@
                                             },
                                             "input": {
                                               "match_deal": "{{match_deal.output}}"
+                                            },
+                                            "errorHandlingOptions": {
+                                              "continueOnFailure": {
+                                                "value": true
+                                              }
                                             }
                                           },
                                           "nextAction": {
@@ -440,6 +514,11 @@
                                                   },
                                                   "input": {
                                                     "dealRef": "{{deal_match_check.output.dealId}}"
+                                                  },
+                                                  "errorHandlingOptions": {
+                                                    "continueOnFailure": {
+                                                      "value": true
+                                                    }
                                                   }
                                                 },
                                                 "nextAction": {
@@ -470,6 +549,11 @@
                                                         "H": "{{pick_candidate.output.candidate.source}}",
                                                         "I": "{{pick_candidate.output.candidate.link}}"
                                                       }
+                                                    },
+                                                    "errorHandlingOptions": {
+                                                      "continueOnFailure": {
+                                                        "value": true
+                                                      }
                                                     }
                                                   },
                                                   "nextAction": {
@@ -482,18 +566,27 @@
                                                       "items": "{{parse_extraction.output.tasks}}"
                                                     },
                                                     "nextAction": {
-                                                      "type": "CODE",
+                                                      "type": "PIECE",
                                                       "name": "draft_followup_match",
-                                                      "displayName": "Draft follow-up email (mock, no AI)",
+                                                      "displayName": "Draft follow-up email (AI)",
                                                       "valid": true,
                                                       "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                       "settings": {
-                                                        "sourceCode": {
-                                                          "packageJson": "{}",
-                                                          "code": "export const code = async (params) => {\n  return JSON.stringify({\n    email_subject: 'Mock follow-up subject',\n    email_body: 'Mock follow-up body based on the call.',\n  });\n};"
-                                                        },
+                                                        "pieceName": "@activepieces/piece-ai",
+                                                        "pieceVersion": "0.6.0",
+                                                        "actionName": "askAi",
+                                                        "propertySettings": {},
                                                         "input": {
-                                                          "candidate": "{{pick_candidate.output.candidate}}"
+                                                          "provider": "openai",
+                                                          "model": "gpt-4o-mini",
+                                                          "prompt": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).\n\nWrite a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
+                                                          "creativity": 70,
+                                                          "maxOutputTokens": 1000
+                                                        },
+                                                        "errorHandlingOptions": {
+                                                          "continueOnFailure": {
+                                                            "value": true
+                                                          }
                                                         }
                                                       },
                                                       "nextAction": {
@@ -509,6 +602,11 @@
                                                           },
                                                           "input": {
                                                             "draft_followup": "{{draft_followup_match.output}}"
+                                                          },
+                                                          "errorHandlingOptions": {
+                                                            "continueOnFailure": {
+                                                              "value": true
+                                                            }
                                                           }
                                                         },
                                                         "nextAction": {
@@ -530,6 +628,11 @@
                                                               "subject": "{{parse_draft_match.output.emailSubject}}",
                                                               "body_type": "plain_text",
                                                               "body": "{{parse_draft_match.output.emailBody}}"
+                                                            },
+                                                            "errorHandlingOptions": {
+                                                              "continueOnFailure": {
+                                                                "value": true
+                                                              }
                                                             }
                                                           },
                                                           "nextAction": {
@@ -547,6 +650,11 @@
                                                                 "auth": "{{connections['slack']}}",
                                                                 "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                                 "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_match.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (also saved to your Gmail Drafts):\nSubject: {{parse_draft_match.output.emailSubject}}\n\n{{parse_draft_match.output.emailBody}}\n\nApprove to send — Reject to keep the draft for edits. Nothing sends without your tap."
+                                                              },
+                                                              "errorHandlingOptions": {
+                                                                "continueOnFailure": {
+                                                                  "value": true
+                                                                }
                                                               }
                                                             },
                                                             "nextAction": {
@@ -592,6 +700,11 @@
                                                                     "input": {
                                                                       "auth": "{{connections['gmail']}}",
                                                                       "draft_id": "{{create_draft_match.output.id}}"
+                                                                    },
+                                                                    "errorHandlingOptions": {
+                                                                      "continueOnFailure": {
+                                                                        "value": true
+                                                                      }
                                                                     }
                                                                   },
                                                                   "nextAction": {
@@ -618,6 +731,11 @@
                                                                           "D": "logged",
                                                                           "E": "{{pipeline_ctx_match.output.dealRef}}",
                                                                           "F": "sent"
+                                                                        }
+                                                                      },
+                                                                      "errorHandlingOptions": {
+                                                                        "continueOnFailure": {
+                                                                          "value": true
                                                                         }
                                                                       }
                                                                     },
@@ -648,6 +766,11 @@
                                                                         "D": "logged",
                                                                         "E": "{{pipeline_ctx_match.output.dealRef}}",
                                                                         "F": "rejected"
+                                                                      }
+                                                                    },
+                                                                    "errorHandlingOptions": {
+                                                                      "continueOnFailure": {
+                                                                        "value": true
                                                                       }
                                                                     }
                                                                   },
@@ -686,6 +809,11 @@
                                                             "F": "open",
                                                             "G": "{{pick_candidate.output.candidate.id}}"
                                                           }
+                                                        },
+                                                        "errorHandlingOptions": {
+                                                          "continueOnFailure": {
+                                                            "value": true
+                                                          }
                                                         }
                                                       },
                                                       "nextAction": null
@@ -718,6 +846,11 @@
                                                         "style": "default"
                                                       }
                                                     ]
+                                                  },
+                                                  "errorHandlingOptions": {
+                                                    "continueOnFailure": {
+                                                      "value": true
+                                                    }
                                                   }
                                                 },
                                                 "nextAction": {
@@ -760,7 +893,12 @@
                                                           "packageJson": "{}",
                                                           "code": "export const code = async () => {\n  return { dealId: 'deal_' + Date.now().toString(36), createdAt: new Date().toISOString() };\n};"
                                                         },
-                                                        "input": {}
+                                                        "input": {},
+                                                        "errorHandlingOptions": {
+                                                          "continueOnFailure": {
+                                                            "value": true
+                                                          }
+                                                        }
                                                       },
                                                       "nextAction": {
                                                         "type": "PIECE",
@@ -790,6 +928,11 @@
                                                               "H": "{{sweep_window.output.nowIso}}",
                                                               "I": ""
                                                             }
+                                                          },
+                                                          "errorHandlingOptions": {
+                                                            "continueOnFailure": {
+                                                              "value": true
+                                                            }
                                                           }
                                                         },
                                                         "nextAction": {
@@ -805,6 +948,11 @@
                                                             },
                                                             "input": {
                                                               "dealRef": "{{new_deal_id.output.dealId}}"
+                                                            },
+                                                            "errorHandlingOptions": {
+                                                              "continueOnFailure": {
+                                                                "value": true
+                                                              }
                                                             }
                                                           },
                                                           "nextAction": {
@@ -835,6 +983,11 @@
                                                                   "H": "{{pick_candidate.output.candidate.source}}",
                                                                   "I": "{{pick_candidate.output.candidate.link}}"
                                                                 }
+                                                              },
+                                                              "errorHandlingOptions": {
+                                                                "continueOnFailure": {
+                                                                  "value": true
+                                                                }
                                                               }
                                                             },
                                                             "nextAction": {
@@ -847,18 +1000,27 @@
                                                                 "items": "{{parse_extraction.output.tasks}}"
                                                               },
                                                               "nextAction": {
-                                                                "type": "CODE",
+                                                                "type": "PIECE",
                                                                 "name": "draft_followup_create",
-                                                                "displayName": "Draft follow-up email (mock, no AI)",
+                                                                "displayName": "Draft follow-up email (AI)",
                                                                 "valid": true,
                                                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                 "settings": {
-                                                                  "sourceCode": {
-                                                                    "packageJson": "{}",
-                                                                    "code": "export const code = async (params) => {\n  return JSON.stringify({\n    email_subject: 'Mock follow-up subject',\n    email_body: 'Mock follow-up body based on the call.',\n  });\n};"
-                                                                  },
+                                                                  "pieceName": "@activepieces/piece-ai",
+                                                                  "pieceVersion": "0.6.0",
+                                                                  "actionName": "askAi",
+                                                                  "propertySettings": {},
                                                                   "input": {
-                                                                    "candidate": "{{pick_candidate.output.candidate}}"
+                                                                    "provider": "openai",
+                                                                    "model": "gpt-4o-mini",
+                                                                    "prompt": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).\n\nWrite a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
+                                                                    "creativity": 70,
+                                                                    "maxOutputTokens": 1000
+                                                                  },
+                                                                  "errorHandlingOptions": {
+                                                                    "continueOnFailure": {
+                                                                      "value": true
+                                                                    }
                                                                   }
                                                                 },
                                                                 "nextAction": {
@@ -874,6 +1036,11 @@
                                                                     },
                                                                     "input": {
                                                                       "draft_followup": "{{draft_followup_create.output}}"
+                                                                    },
+                                                                    "errorHandlingOptions": {
+                                                                      "continueOnFailure": {
+                                                                        "value": true
+                                                                      }
                                                                     }
                                                                   },
                                                                   "nextAction": {
@@ -895,6 +1062,11 @@
                                                                         "subject": "{{parse_draft_create.output.emailSubject}}",
                                                                         "body_type": "plain_text",
                                                                         "body": "{{parse_draft_create.output.emailBody}}"
+                                                                      },
+                                                                      "errorHandlingOptions": {
+                                                                        "continueOnFailure": {
+                                                                          "value": true
+                                                                        }
                                                                       }
                                                                     },
                                                                     "nextAction": {
@@ -912,6 +1084,11 @@
                                                                           "auth": "{{connections['slack']}}",
                                                                           "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                                           "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_create.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (also saved to your Gmail Drafts):\nSubject: {{parse_draft_create.output.emailSubject}}\n\n{{parse_draft_create.output.emailBody}}\n\nApprove to send — Reject to keep the draft for edits. Nothing sends without your tap."
+                                                                        },
+                                                                        "errorHandlingOptions": {
+                                                                          "continueOnFailure": {
+                                                                            "value": true
+                                                                          }
                                                                         }
                                                                       },
                                                                       "nextAction": {
@@ -957,6 +1134,11 @@
                                                                               "input": {
                                                                                 "auth": "{{connections['gmail']}}",
                                                                                 "draft_id": "{{create_draft_create.output.id}}"
+                                                                              },
+                                                                              "errorHandlingOptions": {
+                                                                                "continueOnFailure": {
+                                                                                  "value": true
+                                                                                }
                                                                               }
                                                                             },
                                                                             "nextAction": {
@@ -983,6 +1165,11 @@
                                                                                     "D": "logged",
                                                                                     "E": "{{pipeline_ctx_create.output.dealRef}}",
                                                                                     "F": "sent"
+                                                                                  }
+                                                                                },
+                                                                                "errorHandlingOptions": {
+                                                                                  "continueOnFailure": {
+                                                                                    "value": true
                                                                                   }
                                                                                 }
                                                                               },
@@ -1013,6 +1200,11 @@
                                                                                   "D": "logged",
                                                                                   "E": "{{pipeline_ctx_create.output.dealRef}}",
                                                                                   "F": "rejected"
+                                                                                }
+                                                                              },
+                                                                              "errorHandlingOptions": {
+                                                                                "continueOnFailure": {
+                                                                                  "value": true
                                                                                 }
                                                                               }
                                                                             },
@@ -1051,6 +1243,11 @@
                                                                       "F": "open",
                                                                       "G": "{{pick_candidate.output.candidate.id}}"
                                                                     }
+                                                                  },
+                                                                  "errorHandlingOptions": {
+                                                                    "continueOnFailure": {
+                                                                      "value": true
+                                                                    }
                                                                   }
                                                                 },
                                                                 "nextAction": null
@@ -1073,6 +1270,11 @@
                                                         },
                                                         "input": {
                                                           "dealRef": "{{parse_extraction.output.suggestedAccount}}"
+                                                        },
+                                                        "errorHandlingOptions": {
+                                                          "continueOnFailure": {
+                                                            "value": true
+                                                          }
                                                         }
                                                       },
                                                       "nextAction": {
@@ -1103,6 +1305,11 @@
                                                               "H": "{{pick_candidate.output.candidate.source}}",
                                                               "I": "{{pick_candidate.output.candidate.link}}"
                                                             }
+                                                          },
+                                                          "errorHandlingOptions": {
+                                                            "continueOnFailure": {
+                                                              "value": true
+                                                            }
                                                           }
                                                         },
                                                         "nextAction": {
@@ -1115,18 +1322,27 @@
                                                             "items": "{{parse_extraction.output.tasks}}"
                                                           },
                                                           "nextAction": {
-                                                            "type": "CODE",
+                                                            "type": "PIECE",
                                                             "name": "draft_followup_skip",
-                                                            "displayName": "Draft follow-up email (mock, no AI)",
+                                                            "displayName": "Draft follow-up email (AI)",
                                                             "valid": true,
                                                             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                             "settings": {
-                                                              "sourceCode": {
-                                                                "packageJson": "{}",
-                                                                "code": "export const code = async (params) => {\n  return JSON.stringify({\n    email_subject: 'Mock follow-up subject',\n    email_body: 'Mock follow-up body based on the call.',\n  });\n};"
-                                                              },
+                                                              "pieceName": "@activepieces/piece-ai",
+                                                              "pieceVersion": "0.6.0",
+                                                              "actionName": "askAi",
+                                                              "propertySettings": {},
                                                               "input": {
-                                                                "candidate": "{{pick_candidate.output.candidate}}"
+                                                                "provider": "openai",
+                                                                "model": "gpt-4o-mini",
+                                                                "prompt": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).\n\nWrite a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you (PRD §9.10).\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, 150-250 words, addressed to the attendee, ending with a blank signature line\"\n}",
+                                                                "creativity": 70,
+                                                                "maxOutputTokens": 1000
+                                                              },
+                                                              "errorHandlingOptions": {
+                                                                "continueOnFailure": {
+                                                                  "value": true
+                                                                }
                                                               }
                                                             },
                                                             "nextAction": {
@@ -1142,6 +1358,11 @@
                                                                 },
                                                                 "input": {
                                                                   "draft_followup": "{{draft_followup_skip.output}}"
+                                                                },
+                                                                "errorHandlingOptions": {
+                                                                  "continueOnFailure": {
+                                                                    "value": true
+                                                                  }
                                                                 }
                                                               },
                                                               "nextAction": {
@@ -1163,6 +1384,11 @@
                                                                     "subject": "{{parse_draft_skip.output.emailSubject}}",
                                                                     "body_type": "plain_text",
                                                                     "body": "{{parse_draft_skip.output.emailBody}}"
+                                                                  },
+                                                                  "errorHandlingOptions": {
+                                                                    "continueOnFailure": {
+                                                                      "value": true
+                                                                    }
                                                                   }
                                                                 },
                                                                 "nextAction": {
@@ -1180,6 +1406,11 @@
                                                                       "auth": "{{connections['slack']}}",
                                                                       "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                                       "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_skip.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (also saved to your Gmail Drafts):\nSubject: {{parse_draft_skip.output.emailSubject}}\n\n{{parse_draft_skip.output.emailBody}}\n\nApprove to send — Reject to keep the draft for edits. Nothing sends without your tap."
+                                                                    },
+                                                                    "errorHandlingOptions": {
+                                                                      "continueOnFailure": {
+                                                                        "value": true
+                                                                      }
                                                                     }
                                                                   },
                                                                   "nextAction": {
@@ -1225,6 +1456,11 @@
                                                                           "input": {
                                                                             "auth": "{{connections['gmail']}}",
                                                                             "draft_id": "{{create_draft_skip.output.id}}"
+                                                                          },
+                                                                          "errorHandlingOptions": {
+                                                                            "continueOnFailure": {
+                                                                              "value": true
+                                                                            }
                                                                           }
                                                                         },
                                                                         "nextAction": {
@@ -1251,6 +1487,11 @@
                                                                                 "D": "logged",
                                                                                 "E": "{{pipeline_ctx_skip.output.dealRef}}",
                                                                                 "F": "sent"
+                                                                              }
+                                                                            },
+                                                                            "errorHandlingOptions": {
+                                                                              "continueOnFailure": {
+                                                                                "value": true
                                                                               }
                                                                             }
                                                                           },
@@ -1281,6 +1522,11 @@
                                                                               "D": "logged",
                                                                               "E": "{{pipeline_ctx_skip.output.dealRef}}",
                                                                               "F": "rejected"
+                                                                            }
+                                                                          },
+                                                                          "errorHandlingOptions": {
+                                                                            "continueOnFailure": {
+                                                                              "value": true
                                                                             }
                                                                           }
                                                                         },
@@ -1318,6 +1564,11 @@
                                                                   "E": "{{loop_tasks_skip.output.item.dueDate}}",
                                                                   "F": "open",
                                                                   "G": "{{pick_candidate.output.candidate.id}}"
+                                                                }
+                                                              },
+                                                              "errorHandlingOptions": {
+                                                                "continueOnFailure": {
+                                                                  "value": true
                                                                 }
                                                               }
                                                             },

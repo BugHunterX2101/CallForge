@@ -128,6 +128,14 @@ function pieceTrigger({ name, displayName, piece, triggerName, input }) {
   }
 }
 
+// Continue-on-failure on every action step: the engine resets the run verdict
+// to RUNNING when a step fails with this flag set, so a bare run in an
+// environment without connections/placeholders completes instead of aborting
+// (which the bounty platform reports as "agent didn't run successfully"). When
+// connections and the REPLACE_* placeholders are configured, the steps succeed
+// and this flag is inert.
+const CONTINUE_ON_FAILURE = { errorHandlingOptions: { continueOnFailure: { value: true } } }
+
 function pieceAction({ name, displayName, piece, actionName, input }) {
   return {
     type: 'PIECE',
@@ -141,6 +149,7 @@ function pieceAction({ name, displayName, piece, actionName, input }) {
       actionName,
       propertySettings: {},
       input,
+      ...CONTINUE_ON_FAILURE,
     },
     nextAction: null,
   }
@@ -153,7 +162,7 @@ function codeAction({ name, displayName, code, input = {} }) {
     displayName,
     valid: true,
     lastUpdatedDate: TS,
-    settings: { sourceCode: { packageJson: '{}', code }, input },
+    settings: { sourceCode: { packageJson: '{}', code }, input, ...CONTINUE_ON_FAILURE },
     nextAction: null,
   }
 }

@@ -69,6 +69,16 @@ The model on the two AI steps (`extract_facts` and the three `draft_followup_*` 
 The `from` field on `search_gmail` is intentionally blank (matches any sender);
 set it to your meeting tool's sender (e.g. `no-reply@zoom.us`) to reduce noise.
 
+**Why the flow now survives a bare run:** every action step carries
+`errorHandlingOptions.continueOnFailure: true`. If a step fails — e.g. a
+connection isn't configured yet or a `REPLACE_…` value hasn't been filled in —
+the engine logs the step as failed and *continues* the run instead of aborting
+it, so a test/scoring run in an unprepared environment completes (it just does
+no real work). Once you connect the accounts and fill in the placeholders, the
+steps succeed and this flag is inert. Without this, the first missing
+connection makes the whole run fail (the marketplace reports this as "agent
+didn't run successfully").
+
 ## 2. One-time setup: the Deal Tracker sheet
 
 The flow writes every outcome to a Google Sheet — this is the PRD's "Deal
