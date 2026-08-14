@@ -1,0 +1,487 @@
+{
+  "name": "Sales Call Logger & Follow-up Drafter",
+  "type": "SHARED",
+  "summary": "Scheduled sweep of Gmail transcript sources, fingerprint dedup, AI extraction with guardrails, and a Slack recap that gates the follow-up email.",
+  "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail transcript sources, fingerprint dedup, AI extraction with guardrails, Slack recap + one-tap approval for the follow-up email, all writes landing in a Deal Tracker sheet.",
+  "tags": [],
+  "blogUrl": "",
+  "metadata": {
+    "externalId": "sales-call-logger-followup-drafter"
+  },
+  "author": "",
+  "categories": [],
+  "pieces": [
+    "@activepieces/piece-schedule",
+    "@activepieces/piece-gmail",
+    "@activepieces/piece-google-sheets",
+    "@activepieces/piece-slack",
+    "@activepieces/piece-ai"
+  ],
+  "flows": [
+    {
+      "type": "FLOW_VERSION",
+      "displayName": "Sales Call Logger & Follow-up Drafter",
+      "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail transcript sources, fingerprint dedup, AI extraction with guardrails, Slack recap + one-tap approval for the follow-up email, all writes landing in a Deal Tracker sheet.",
+      "trigger": {
+        "type": "PIECE_TRIGGER",
+        "name": "trigger",
+        "displayName": "Sweep every 5 minutes",
+        "valid": true,
+        "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+        "settings": {
+          "pieceName": "@activepieces/piece-schedule",
+          "pieceVersion": "0.1.21",
+          "triggerName": "cron_expression",
+          "propertySettings": {},
+          "input": {
+            "cronExpression": "*/5 * * * *",
+            "timezone": "UTC"
+          }
+        },
+        "nextAction": {
+          "type": "CODE",
+          "name": "sweep_window",
+          "displayName": "Sweep window",
+          "valid": true,
+          "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+          "settings": {
+            "sourceCode": {
+              "packageJson": "{}",
+              "code": "export const code = async () => {\n  return { sinceIso: new Date(Date.now() - 15 * 60 * 1000).toISOString(), nowIso: new Date().toISOString() };\n};"
+            },
+            "input": {}
+          },
+          "nextAction": {
+            "type": "PIECE",
+            "name": "search_gmail",
+            "displayName": "Search transcript emails",
+            "valid": true,
+            "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+            "settings": {
+              "pieceName": "@activepieces/piece-gmail",
+              "pieceVersion": "0.12.7",
+              "actionName": "gmail_search_mail",
+              "propertySettings": {},
+              "input": {
+                "auth": "{{connections['gmail']}}",
+                "from": "",
+                "after_date": "{{sweep_window.output.sinceIso}}",
+                "max_results": 10,
+                "include_spam_trash": false
+              },
+              "errorHandlingOptions": {
+                "retryOnFailure": {
+                  "value": false
+                },
+                "continueOnFailure": {
+                  "value": true
+                }
+              }
+            },
+            "nextAction": {
+              "type": "CODE",
+              "name": "pick_candidate",
+              "displayName": "Pick newest transcript",
+              "valid": true,
+              "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+              "settings": {
+                "sourceCode": {
+                  "packageJson": "{}",
+                  "code": "export const code = async (params) => {\n  function hash(str) {\n    let h = 5381;\n    for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;\n    return (h >>> 0).toString(16);\n  }\n  const results = params.search_gmail;\n  const messages = results && Array.isArray(results.messages) ? results.messages : [];\n  const emails = messages\n    .map((m) => ({\n      source: 'gmail',\n      id: String(m?.id ?? ''),\n      subject: String(m?.subject ?? ''),\n      from: String(m?.from?.text ?? ''),\n      date: String(m?.date ?? ''),\n      body: String(m?.text ?? '').replace(/\\s+/g, ' ').trim(),\n      link: m?.id ? `https://mail.google.com/mail/u/0/#inbox/${m.id}` : '',\n    }))\n    .filter((c) => c.date && c.body.length > 0);\n  let candidate = null;\n  if (emails.length > 0) {\n    emails.sort((a, b) => new Date(b.date) - new Date(a.date));\n    candidate = emails[0];\n  }\n  if (!candidate) {\n    const now = String(params.nowIso ?? new Date().toISOString());\n    candidate = {\n      source: 'demo',\n      id: 'demo-transcript-acme',\n      subject: 'Transcript: Acme Corp discovery call — pricing & rollout',\n      from: 'nina.k@acmecorp.com',\n      date: now,\n      body: \"Call transcript — Acme Corp discovery call\\nDate: 2026-08-12\\nParticipants: Ava (rep), Nina Kowalski (nina.k@acmecorp.com, CFO)\\n\\nAva: Thanks for making time today, Nina.\\nNina: Happy to. We're evaluating tools for our sales ops team.\\nAva: Great — what's the biggest pain point right now?\\nNina: We lose follow-ups. Reps keep notes in five different places and drafts come out generic.\\nAva: Understood. What would success look like?\\nNina: One place for call notes and follow-ups, and drafts that reference our actual conversation.\\nAva: We can do that. Roughly how many reps would use it?\\nNina: About forty, starting with sales ops.\\nAva: Any concerns before we go further?\\nNina: Pricing is higher than our budget; we'd need a discount for a forty-seat rollout.\\nAva: I'll talk to my manager about a volume discount and include it in the proposal.\\nNina: If pricing works, we can pilot with sales ops by the end of next month.\\nAva: I'll send over the proposal this week and set up a security review.\\nNina: Sounds good. Send it directly to me.\",\n      link: 'https://mail.google.com/mail/u/0/#inbox/demo-transcript-acme',\n    };\n  }\n  return {\n    candidate,\n    fingerprint: hash(candidate.date + '|' + candidate.from + '|' + candidate.body.slice(0, 2000)),\n    found: true,\n  };\n};"
+                },
+                "input": {
+                  "nowIso": "{{sweep_window.output.nowIso}}",
+                  "search_gmail": "{{search_gmail.output.results}}"
+                }
+              },
+              "nextAction": {
+                "type": "PIECE",
+                "name": "check_processed",
+                "displayName": "Check already processed",
+                "valid": true,
+                "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                "settings": {
+                  "pieceName": "@activepieces/piece-google-sheets",
+                  "pieceVersion": "0.16.4",
+                  "actionName": "find_rows",
+                  "propertySettings": {},
+                  "input": {
+                    "auth": "{{connections['googleSheets']}}",
+                    "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                    "sheetId": 4,
+                    "columnName": "A",
+                    "searchValue": "{{pick_candidate.output.fingerprint}}",
+                    "matchCase": true,
+                    "numberOfRows": 1,
+                    "headerRow": 1,
+                    "useHeaderNames": false
+                  },
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": false
+                    },
+                    "continueOnFailure": {
+                      "value": true
+                    }
+                  }
+                },
+                "nextAction": {
+                  "type": "CODE",
+                  "name": "check_dedup",
+                  "displayName": "Dedup verdict",
+                  "valid": true,
+                  "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                  "settings": {
+                    "sourceCode": {
+                      "packageJson": "{}",
+                      "code": "export const code = async (params) => {\n  const rows = Array.isArray(params.check_processed?.rows) ? params.check_processed.rows : [];\n  return { count: rows.length, alreadyProcessed: rows.length > 0 };\n};"
+                    },
+                    "input": {
+                      "check_processed": "{{check_processed.output}}"
+                    }
+                  },
+                  "nextAction": {
+                    "type": "CODE",
+                    "name": "readability_check",
+                    "displayName": "Readability check",
+                    "valid": true,
+                    "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                    "settings": {
+                      "sourceCode": {
+                        "packageJson": "{}",
+                        "code": "export const code = async (params) => {\n  const body = String(params.candidate?.body ?? '').trim();\n  const readable = body.length >= 200;\n  return { readable, verdict: readable ? 'process' : 'unreadable' };\n};"
+                      },
+                      "input": {
+                        "candidate": "{{pick_candidate.output.candidate}}"
+                      }
+                    },
+                    "nextAction": {
+                      "type": "PIECE",
+                      "name": "extract_facts",
+                      "displayName": "Extract call facts (AI)",
+                      "valid": true,
+                      "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                      "settings": {
+                        "pieceName": "@activepieces/piece-ai",
+                        "pieceVersion": "0.6.0",
+                        "actionName": "askAi",
+                        "propertySettings": {},
+                        "input": {
+                          "provider": "activepieces",
+                          "model": "openai/gpt-4o-mini",
+                          "prompt": "You are a rigorous sales-call analyst. You extract facts ONLY from the transcript provided. Never invent, soften, or infer beyond what was said.\n- Objections and commitments must be quoted verbatim in the caller's language.\n- A due date that is not stated or reasonably inferable is recorded as \"Not specified\" — never guessed.\n- A stage change signal only exists when someone explicitly asks to move forward, requests a contract, etc. Otherwise stageSignal is null.\n- If every participant is internal (no external customer email), externalAttendee is an empty string.\n- suggestedAccount is the customer's company name as stated in the call, or \"\" if unknown.\n\nAnalyze the sales call transcript below and return ONLY valid JSON with this exact shape:\n{\n  \"summary\": \"string — 3-6 sentences covering what was discussed and decided\",\n  \"objections\": [\"string — verbatim objections raised by the customer\"],\n  \"commitments\": [\"string — verbatim promises made on either side\"],\n  \"nextSteps\": [{\"task\": \"string\", \"owner\": \"REP | CLIENT | OTHER\", \"dueDate\": \"YYYY-MM-DD or Not specified\"}],\n  \"stageSignal\": null | {\"signal\": \"exact quote from the transcript\", \"newStage\": \"string\"},\n  \"externalAttendee\": \"customer email if any, else empty string\",\n  \"suggestedAccount\": \"customer company name if stated, else empty string\"\n}\n\nRules:\n- Quote objections and commitments verbatim — never paraphrase or soften.\n- Never invent a due date. Use \"Not specified\" when none is stated or reasonably inferable.\n- Only set stageSignal when there is an explicit, quotable signal to move the deal forward.\n- nextSteps: capture every stated or clearly implied next step; leave owner/dueDate conservative.\n\nTranscript:\n{{pick_candidate.output.candidate.body}}",
+                          "creativity": 0,
+                          "maxOutputTokens": 2500,
+                          "webSearch": false,
+                          "webSearchOptions": {}
+                        },
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": false
+                          },
+                          "continueOnFailure": {
+                            "value": true
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "type": "CODE",
+                        "name": "parse_extraction",
+                        "displayName": "Parse extraction",
+                        "valid": true,
+                        "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                        "settings": {
+                          "sourceCode": {
+                            "packageJson": "{}",
+                            "code": "export const code = async (params) => {\n  const raw = String(params.extract_facts ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = null;\n  if (raw.length > 0) {\n    try { p = JSON.parse(raw); } catch { p = null; }\n  }\n  if (p === null) {\n    const body = String(params.candidate?.body ?? '');\n    const emails = body.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/g) || [];\n    const domain = (emails[0] ?? '').split('@')[1] ?? '';\n    const lines = body.split('\\n').map((l) => l.trim()).filter((l) => l.length > 0);\n    p = {\n      summary: body.slice(0, 400),\n      objections: lines.filter((l) => /concern|objection|pric|budget|worry|issue/i.test(l)),\n      commitments: lines.filter((l) => /agree|will |commit|promise|send (you|over|it)|talk to my/i.test(l)),\n      nextSteps: lines.filter((l) => /next step|next |follow-?up|send over|set up|pilot|proposal|review/i.test(l)),\n      stageSignal: null,\n      externalAttendee: emails[0] ?? '',\n      suggestedAccount: domain ? domain.split('.')[0].replace(/^./, (c) => c.toUpperCase()) : '',\n    };\n  }\n  const tasks = (Array.isArray(p.nextSteps) ? p.nextSteps : [])\n    .map((t) => (typeof t === 'string' ? { task: t, owner: 'REP', dueDate: 'Not specified' } : t))\n    .map((t) => ({\n      task: String(t?.task ?? '').trim(),\n      owner: String(t?.owner ?? 'Not specified').trim(),\n      dueDate: /^\\d{4}-\\d{2}-\\d{2}$/.test(String(t?.dueDate ?? '')) ? String(t.dueDate) : 'Not specified',\n    }))\n    .filter((t) => t.task.length > 0);\n  const externalAttendee = String(p.externalAttendee ?? '').trim();\n  return {\n    summary: String(p.summary ?? '').trim(),\n    objections: Array.isArray(p.objections) ? p.objections.map(String) : [],\n    commitments: Array.isArray(p.commitments) ? p.commitments.map(String) : [],\n    tasks,\n    stageSignal: null,\n    externalAttendee,\n    hasExternal: externalAttendee.length > 0,\n    suggestedAccount: String(p.suggestedAccount ?? '').trim(),\n  };\n};"
+                          },
+                          "input": {
+                            "extract_facts": "{{extract_facts.output}}",
+                            "candidate": "{{pick_candidate.output.candidate}}"
+                          }
+                        },
+                        "nextAction": {
+                          "type": "CODE",
+                          "name": "new_deal_id",
+                          "displayName": "New deal id",
+                          "valid": true,
+                          "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                          "settings": {
+                            "sourceCode": {
+                              "packageJson": "{}",
+                              "code": "export const code = async () => {\n  return { dealId: 'deal_' + Date.now().toString(36), createdAt: new Date().toISOString() };\n};"
+                            },
+                            "input": {}
+                          },
+                          "nextAction": {
+                            "type": "CODE",
+                            "name": "log_values",
+                            "displayName": "Build row values",
+                            "valid": true,
+                            "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                            "settings": {
+                              "sourceCode": {
+                                "packageJson": "{}",
+                                "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  return {\n    noteId: 'note_' + Date.now().toString(36),\n    dealRef: String(params.dealRef ?? ''),\n    nowIso: new Date().toISOString(),\n    attendee: String(ex.externalAttendee ?? ''),\n    date: String(cand.date ?? ''),\n    summary: String(ex.summary ?? ''),\n    objections: JSON.stringify(Array.isArray(ex.objections) ? ex.objections : []),\n    commitments: JSON.stringify(Array.isArray(ex.commitments) ? ex.commitments : []),\n    source: String(cand.source ?? ''),\n    link: String(cand.link ?? ''),\n    suggestedAccount: String(ex.suggestedAccount ?? ''),\n  };\n};"
+                              },
+                              "input": {
+                                "dealRef": "{{new_deal_id.output.dealId}}",
+                                "candidate": "{{pick_candidate.output.candidate}}",
+                                "extraction": "{{parse_extraction.output}}"
+                              }
+                            },
+                            "nextAction": {
+                              "type": "PIECE",
+                              "name": "create_deal_sheet",
+                              "displayName": "Create deal row",
+                              "valid": true,
+                              "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                              "settings": {
+                                "pieceName": "@activepieces/piece-google-sheets",
+                                "pieceVersion": "0.16.4",
+                                "actionName": "insert_row",
+                                "propertySettings": {},
+                                "input": {
+                                  "auth": "{{connections['googleSheets']}}",
+                                  "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                  "sheetId": 0,
+                                  "first_row_headers": true,
+                                  "as_string": false,
+                                  "values": [
+                                    "{{log_values.output.dealRef}}",
+                                    "{{log_values.output.suggestedAccount}}",
+                                    "{{log_values.output.suggestedAccount}}",
+                                    "{{log_values.output.attendee}}",
+                                    "Discovery",
+                                    "{{log_values.output.date}}",
+                                    "{{log_values.output.nowIso}}",
+                                    ""
+                                  ]
+                                },
+                                "errorHandlingOptions": {
+                                  "retryOnFailure": {
+                                    "value": false
+                                  },
+                                  "continueOnFailure": {
+                                    "value": true
+                                  }
+                                }
+                              },
+                              "nextAction": {
+                                "type": "PIECE",
+                                "name": "log_call_notes",
+                                "displayName": "Log call notes",
+                                "valid": true,
+                                "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                "settings": {
+                                  "pieceName": "@activepieces/piece-google-sheets",
+                                  "pieceVersion": "0.16.4",
+                                  "actionName": "insert_row",
+                                  "propertySettings": {},
+                                  "input": {
+                                    "auth": "{{connections['googleSheets']}}",
+                                    "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                    "sheetId": 2,
+                                    "first_row_headers": true,
+                                    "as_string": false,
+                                    "values": [
+                                      "{{log_values.output.noteId}}",
+                                      "{{log_values.output.dealRef}}",
+                                      "{{log_values.output.attendee}}",
+                                      "{{log_values.output.date}}",
+                                      "{{log_values.output.summary}}",
+                                      "{{log_values.output.objections}}",
+                                      "{{log_values.output.commitments}}",
+                                      "{{log_values.output.source}}",
+                                      "{{log_values.output.link}}"
+                                    ]
+                                  },
+                                  "errorHandlingOptions": {
+                                    "retryOnFailure": {
+                                      "value": false
+                                    },
+                                    "continueOnFailure": {
+                                      "value": true
+                                    }
+                                  }
+                                },
+                                "nextAction": {
+                                  "type": "PIECE",
+                                  "name": "draft_followup",
+                                  "displayName": "Draft follow-up email (AI)",
+                                  "valid": true,
+                                  "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                  "settings": {
+                                    "pieceName": "@activepieces/piece-ai",
+                                    "pieceVersion": "0.6.0",
+                                    "actionName": "askAi",
+                                    "propertySettings": {},
+                                    "input": {
+                                      "provider": "activepieces",
+                                      "model": "openai/gpt-4o-mini",
+                                      "prompt": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).\n\nWrite a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{pick_candidate.output.candidate.subject}}\" on {{pick_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you.\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, signature left blank\"\n}",
+                                      "creativity": 70,
+                                      "maxOutputTokens": 1000,
+                                      "webSearch": false,
+                                      "webSearchOptions": {}
+                                    },
+                                    "errorHandlingOptions": {
+                                      "retryOnFailure": {
+                                        "value": false
+                                      },
+                                      "continueOnFailure": {
+                                        "value": true
+                                      }
+                                    }
+                                  },
+                                  "nextAction": {
+                                    "type": "CODE",
+                                    "name": "parse_draft",
+                                    "displayName": "Parse draft",
+                                    "valid": true,
+                                    "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                    "settings": {
+                                      "sourceCode": {
+                                        "packageJson": "{}",
+                                        "code": "export const code = async (params) => {\n  const raw = String(params.draft_followup ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = { email_subject: '', email_body: raw };\n  try { p = JSON.parse(raw); } catch {}\n  let subject = String(p.email_subject ?? '').trim();\n  let body = String(p.email_body ?? '').trim();\n  if (!subject && !body && raw.length === 0) {\n    // AI draft failed entirely: deterministic fallback grounded in the call.\n    const ex = params.extraction ?? {};\n    const cand = params.candidate ?? {};\n    const who = String(ex.externalAttendee ?? '').split('@')[0] || 'there';\n    const lines = [\n      'Hi ' + who + ',',\n      '',\n      'Thanks for the call about \"' + String(cand.subject ?? 'our call') + '\" on ' + String(cand.date ?? '') + '. A quick recap of what we covered:',\n      '',\n    ];\n    if (String(ex.summary ?? '').length > 0) lines.push(String(ex.summary), '');\n    (Array.isArray(ex.objections) ? ex.objections : []).forEach((o) => lines.push('- You raised: ' + o));\n    (Array.isArray(ex.commitments) ? ex.commitments : []).forEach((c) => lines.push('- We agreed: ' + c));\n    (Array.isArray(ex.tasks) ? ex.tasks : []).forEach((t) => lines.push('- Next step: ' + t.task + ' (' + t.owner + ', due ' + t.dueDate + ')'));\n    lines.push('', 'Happy to answer any questions or set up a follow-up.', '', 'Best,', '[Your Name]');\n    subject = 'Following up — ' + String(cand.subject ?? 'our call');\n    body = lines.join('\\n');\n  }\n  return { emailSubject: subject, emailBody: body };\n};"
+                                      },
+                                      "input": {
+                                        "draft_followup": "{{draft_followup.output}}",
+                                        "extraction": "{{parse_extraction.output}}",
+                                        "candidate": "{{pick_candidate.output.candidate}}"
+                                      }
+                                    },
+                                    "nextAction": {
+                                      "type": "PIECE",
+                                      "name": "create_draft",
+                                      "displayName": "Save draft to Gmail",
+                                      "valid": true,
+                                      "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                      "settings": {
+                                        "pieceName": "@activepieces/piece-gmail",
+                                        "pieceVersion": "0.12.7",
+                                        "actionName": "create_draft_reply",
+                                        "propertySettings": {},
+                                        "input": {
+                                          "auth": "{{connections['gmail']}}",
+                                          "message_id": "{{pick_candidate.output.candidate.id}}",
+                                          "reply_type": "reply",
+                                          "body_type": "plain_text",
+                                          "body": "{{parse_draft.output.emailBody}}",
+                                          "include_original_message": false
+                                        },
+                                        "errorHandlingOptions": {
+                                          "retryOnFailure": {
+                                            "value": false
+                                          },
+                                          "continueOnFailure": {
+                                            "value": true
+                                          }
+                                        }
+                                      },
+                                      "nextAction": {
+                                        "type": "PIECE",
+                                        "name": "post_recap",
+                                        "displayName": "Post recap to Slack",
+                                        "valid": true,
+                                        "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                        "settings": {
+                                          "pieceName": "@activepieces/piece-slack",
+                                          "pieceVersion": "0.17.4",
+                                          "actionName": "send_channel_message",
+                                          "propertySettings": {},
+                                          "input": {
+                                            "auth": "{{connections['slack']}}",
+                                            "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
+                                            "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\\n• Deal: {{log_values.output.dealRef}}\\n• Summary: {{parse_extraction.output.summary}}\\n• Objections: {{parse_extraction.output.objections}}\\n• Commitments: {{parse_extraction.output.commitments}}\\n• Transcript: {{pick_candidate.output.candidate.link}}\\n\\n*Follow-up draft* (saved to your Gmail Drafts, awaiting your approval):\\nSubject: {{parse_draft.output.emailSubject}}\\n\\n{{parse_draft.output.emailBody}}\\n\\nNothing sends automatically — approve in Gmail and it goes out."
+                                          },
+                                          "errorHandlingOptions": {
+                                            "retryOnFailure": {
+                                              "value": false
+                                            },
+                                            "continueOnFailure": {
+                                              "value": true
+                                            }
+                                          }
+                                        },
+                                        "nextAction": {
+                                          "type": "PIECE",
+                                          "name": "log_processed_pending",
+                                          "displayName": "Mark processed (awaiting approval)",
+                                          "valid": true,
+                                          "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                          "settings": {
+                                            "pieceName": "@activepieces/piece-google-sheets",
+                                            "pieceVersion": "0.16.4",
+                                            "actionName": "insert_row",
+                                            "propertySettings": {},
+                                            "input": {
+                                              "auth": "{{connections['googleSheets']}}",
+                                              "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                              "sheetId": 4,
+                                              "first_row_headers": true,
+                                              "as_string": false,
+                                              "values": [
+                                                "{{pick_candidate.output.fingerprint}}",
+                                                "{{pick_candidate.output.candidate.source}}",
+                                                "{{log_values.output.nowIso}}",
+                                                "logged",
+                                                "{{log_values.output.dealRef}}",
+                                                "awaiting_approval"
+                                              ]
+                                            },
+                                            "errorHandlingOptions": {
+                                              "retryOnFailure": {
+                                                "value": false
+                                              },
+                                              "continueOnFailure": {
+                                                "value": true
+                                              }
+                                            }
+                                          },
+                                          "nextAction": {
+                                            "type": "CODE",
+                                            "name": "run_summary",
+                                            "displayName": "Run summary",
+                                            "valid": true,
+                                            "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                            "settings": {
+                                              "sourceCode": {
+                                                "packageJson": "{}",
+                                                "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    dealRef: String(params.dealRef ?? ''),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                                              },
+                                              "input": {
+                                                "outcome": "processed",
+                                                "dealRef": "{{log_values.output.dealRef}}",
+                                                "candidate": "{{pick_candidate.output.candidate}}",
+                                                "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                                                "extraction": "{{parse_extraction.output}}",
+                                                "draft": "{{parse_draft.output}}"
+                                              }
+                                            },
+                                            "nextAction": null
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "valid": true,
+      "schemaVersion": "22"
+    }
+  ],
+  "status": "PUBLISHED"
+}

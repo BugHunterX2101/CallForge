@@ -7,14 +7,29 @@ platform's upload box actually wants.
 
 | File | What it is |
 |---|---|
-| [`flows.json`](../flows.json) | **THE SUBMISSION.** A `SharedTemplate` with a `flows` list — the linear, all-code flow. Schedule trigger + 10 code steps, bare shape (no pieces, routers, loops, connections). This is the artifact to paste/upload. |
-| [`agent.json`](../agent.json) | The same submission flow as a single `FLOW_VERSION` export, for upload boxes that want a raw flow. |
-| [`flows-full.json`](../flows-full.json) | The full integration build (Gmail/Drive/Sheets/Slack/AI pieces, routers, loops, connections) — preserved for layering real writes back in once the submission runs. |
-| [`agent-full.json`](../agent-full.json) | The integration build as a raw flow export. |
-| [`build-agent-codeonly.mjs`](./build-agent-codeonly.mjs) | Generator for the submission (`flows.json`/`agent.json`). |
-| [`build-agent.mjs`](./build-agent.mjs) | Generator for the integration build (`flows-full.json`/`agent-full.json`). `BARE=1` (default) emits the bare shape; `BARE=0` the fully-decorated export for stock ActivePieces. |
-| [`test-codeonly.mjs`](./test-codeonly.mjs) | End-to-end test: executes the submission flow's whole linear chain through its real bindings and asserts complete output. |
-| [`test-agent.mjs`](./test-agent.mjs) | Behavior test harness for the integration build's code steps (reads `agent-full.json`). |
+| [`flows-v3.json`](../flows-v3.json) | **THE INTEGRATED SUBMISSION.** Linear flow with the real pieces — Gmail transcript search, Sheets dedup + Deal Tracker writes, Slack recap, AI extraction — using the **exact piece versions/action names/props the gravity.fast runner ships** (`gmail@0.12.7 gmail_search_mail`, `google-sheets@0.16.4 find_rows/insert_row`, `slack@0.17.4 send_channel_message`, `ai@0.6.0 askAi`). Upload this. |
+| [`agent-v3.json`](../agent-v3.json) | The same flow as a single `FLOW_VERSION` export. |
+| [`flows.json`](../flows.json) | The fallback submission — the linear, all-code flow (no pieces) that is guaranteed to run. |
+| [`agent.json`](../agent.json) | The all-code flow as a raw export. |
+| [`flows-full.json`](../flows-full.json) | The old full integration build (routers/loops/Drive, newer piece versions) — kept for reference. |
+| [`build-agent-platform.mjs`](./build-agent-platform.mjs) | Generator for v3 (`flows-v3.json`/`agent-v3.json`). |
+| [`build-agent-codeonly.mjs`](./build-agent-codeonly.mjs) | Generator for the all-code fallback (`flows.json`/`agent.json`; `WITH_GMAIL=1` also emits the v2 probe). |
+| [`build-agent.mjs`](./build-agent.mjs) | Generator for the reference full build (`flows-full.json`/`agent-full.json`). |
+| [`test-platform.mjs`](./test-platform.mjs) | End-to-end test for v3: executes its code steps through real bindings with mocked piece outputs (sandbox scenario) and asserts complete output. |
+| [`test-codeonly.mjs`](./test-codeonly.mjs) | End-to-end test for the all-code fallback. |
+| [`test-agent.mjs`](./test-agent.mjs) | Behavior test harness for the reference build (reads `agent-full.json`). |
+
+**Why v3 uses different action names than the earlier builds.** The platform's
+runner bundles **older piece versions** than the ones real ActivePieces cloud
+exports use. Verified against the platform's own piece bundles (its public
+apps catalog + the npm tarballs at those versions), the correct names are
+`gmail_search_mail` (not `gmail_search_email`), `find_rows`/`insert_row` (not
+`sheets_find_rows`/`sheets_add_row`), `send_channel_message` (not
+`slack_post_message`), `list-files` (not `drive_list_files`), and `askAi` with
+`maxOutputTokens` as a NUMBER. The earlier integrated flows failed with
+"didn't run successfully / No output" because the first piece step referenced
+a name that does not exist in the platform's bundle — the step could not even
+be built. v3 uses only names/props that exist in the platform's exact versions.
 
 **Which file to upload?** If the box accepts a template / "flows" list, use
 `flows.json`. If it wants a single flow export, use `agent.json`. Both are the
