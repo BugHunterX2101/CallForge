@@ -1,7 +1,5 @@
 {
   "type": "FLOW_VERSION",
-  "id": "EPeLSzIJir8pM5EXK5ylY",
-  "flowId": "jc1MRyF6tiVMVo7mBKrMJ",
   "displayName": "Sales Call Logger & Follow-up Drafter",
   "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail (and Drive) transcript sources, fingerprint dedup, AI extraction with guardrails, Slack recap + one-tap approval for the follow-up email, all writes landing in a Deal Tracker sheet.",
   "trigger": {
@@ -14,83 +12,42 @@
       "pieceName": "@activepieces/piece-schedule",
       "pieceVersion": "0.1.21",
       "triggerName": "cron_expression",
-      "propertySettings": {
-        "cronExpression": {
-          "type": "MANUAL"
-        },
-        "timezone": {
-          "type": "MANUAL"
-        }
-      },
+      "propertySettings": {},
       "input": {
         "cronExpression": "*/5 * * * *",
         "timezone": "UTC"
-      },
-      "sampleData": {}
+      }
     },
     "nextAction": {
       "type": "CODE",
       "name": "sweep_window",
       "displayName": "Sweep window",
       "valid": true,
-      "skip": false,
       "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
       "settings": {
         "sourceCode": {
           "packageJson": "{}",
           "code": "export const code = async () => {\n  const sinceIso = new Date(Date.now() - 15 * 60 * 1000).toISOString();\n  const nowIso = new Date().toISOString();\n  return { sinceIso, nowIso };\n};"
         },
-        "input": {},
-        "sampleData": {},
-        "errorHandlingOptions": {
-          "retryOnFailure": {
-            "value": false
-          },
-          "continueOnFailure": {
-            "value": true
-          }
-        }
+        "input": {}
       },
       "nextAction": {
         "type": "PIECE",
         "name": "search_gmail",
         "displayName": "Search transcript emails",
         "valid": true,
-        "skip": false,
         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
         "settings": {
           "pieceName": "@activepieces/piece-gmail",
           "pieceVersion": "0.12.10",
           "actionName": "gmail_search_email",
-          "propertySettings": {
-            "from": {
-              "type": "MANUAL"
-            },
-            "after_date": {
-              "type": "MANUAL"
-            },
-            "max_results": {
-              "type": "MANUAL"
-            },
-            "include_spam_trash": {
-              "type": "MANUAL"
-            }
-          },
+          "propertySettings": {},
           "input": {
             "auth": "{{connections['gmail']}}",
             "from": "",
             "after_date": "{{sweep_window.output.sinceIso}}",
             "max_results": 10,
             "include_spam_trash": false
-          },
-          "sampleData": {},
-          "errorHandlingOptions": {
-            "retryOnFailure": {
-              "value": false
-            },
-            "continueOnFailure": {
-              "value": true
-            }
           }
         },
         "nextAction": {
@@ -98,29 +55,12 @@
           "name": "list_drive",
           "displayName": "List transcript folder (Drive)",
           "valid": true,
-          "skip": false,
           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
           "settings": {
             "pieceName": "@activepieces/piece-google-drive",
             "pieceVersion": "0.8.3",
             "actionName": "drive_list_files",
-            "propertySettings": {
-              "folder_id": {
-                "type": "MANUAL"
-              },
-              "include_trashed": {
-                "type": "MANUAL"
-              },
-              "depth_level": {
-                "type": "MANUAL"
-              },
-              "download_files": {
-                "type": "MANUAL"
-              },
-              "include_team_drives": {
-                "type": "MANUAL"
-              }
-            },
+            "propertySettings": {},
             "input": {
               "auth": "{{connections['googleDrive']}}",
               "folder_id": "REPLACE_WITH_TRANSCRIPT_FOLDER_ID",
@@ -128,15 +68,6 @@
               "depth_level": 1,
               "download_files": false,
               "include_team_drives": false
-            },
-            "sampleData": {},
-            "errorHandlingOptions": {
-              "retryOnFailure": {
-                "value": false
-              },
-              "continueOnFailure": {
-                "value": true
-              }
             }
           },
           "nextAction": {
@@ -144,7 +75,6 @@
             "name": "pick_candidate",
             "displayName": "Pick newest transcript",
             "valid": true,
-            "skip": false,
             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
             "settings": {
               "sourceCode": {
@@ -153,15 +83,6 @@
               },
               "input": {
                 "search_gmail": "{{search_gmail.output.results}}"
-              },
-              "sampleData": {},
-              "errorHandlingOptions": {
-                "retryOnFailure": {
-                  "value": false
-                },
-                "continueOnFailure": {
-                  "value": true
-                }
               }
             },
             "nextAction": {
@@ -169,7 +90,6 @@
               "name": "candidate_gate",
               "displayName": "Any transcript this sweep?",
               "valid": true,
-              "skip": false,
               "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
               "settings": {
                 "branches": [
@@ -191,8 +111,7 @@
                     "branchName": "has_candidate"
                   }
                 ],
-                "executionType": "EXECUTE_FIRST_MATCH",
-                "sampleData": {}
+                "executionType": "EXECUTE_FIRST_MATCH"
               },
               "children": [
                 {
@@ -200,7 +119,6 @@
                   "name": "run_summary_none",
                   "displayName": "Run summary",
                   "valid": true,
-                  "skip": false,
                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                   "settings": {
                     "sourceCode": {
@@ -212,15 +130,6 @@
                       "candidate": "{{pick_candidate.output.candidate}}",
                       "fingerprint": "{{pick_candidate.output.fingerprint}}",
                       "extraction": "{{parse_extraction.output}}"
-                    },
-                    "sampleData": {},
-                    "errorHandlingOptions": {
-                      "retryOnFailure": {
-                        "value": false
-                      },
-                      "continueOnFailure": {
-                        "value": true
-                      }
                     }
                   },
                   "nextAction": null
@@ -230,32 +139,12 @@
                   "name": "check_processed",
                   "displayName": "Check already processed",
                   "valid": true,
-                  "skip": false,
                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                   "settings": {
                     "pieceName": "@activepieces/piece-google-sheets",
                     "pieceVersion": "0.16.7",
                     "actionName": "sheets_find_rows",
-                    "propertySettings": {
-                      "spreadsheet_id": {
-                        "type": "MANUAL"
-                      },
-                      "sheet_id": {
-                        "type": "MANUAL"
-                      },
-                      "column_name": {
-                        "type": "MANUAL"
-                      },
-                      "search_value": {
-                        "type": "MANUAL"
-                      },
-                      "match_case": {
-                        "type": "MANUAL"
-                      },
-                      "number_of_rows": {
-                        "type": "MANUAL"
-                      }
-                    },
+                    "propertySettings": {},
                     "input": {
                       "auth": "{{connections['googleSheets']}}",
                       "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -264,15 +153,6 @@
                       "search_value": "{{pick_candidate.output.fingerprint}}",
                       "match_case": true,
                       "number_of_rows": 1
-                    },
-                    "sampleData": {},
-                    "errorHandlingOptions": {
-                      "retryOnFailure": {
-                        "value": false
-                      },
-                      "continueOnFailure": {
-                        "value": true
-                      }
                     }
                   },
                   "nextAction": {
@@ -280,7 +160,6 @@
                     "name": "check_dedup",
                     "displayName": "Dedup verdict",
                     "valid": true,
-                    "skip": false,
                     "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                     "settings": {
                       "sourceCode": {
@@ -289,15 +168,6 @@
                       },
                       "input": {
                         "check_processed": "{{check_processed.output}}"
-                      },
-                      "sampleData": {},
-                      "errorHandlingOptions": {
-                        "retryOnFailure": {
-                          "value": false
-                        },
-                        "continueOnFailure": {
-                          "value": true
-                        }
                       }
                     },
                     "nextAction": {
@@ -305,7 +175,6 @@
                       "name": "dedup_gate",
                       "displayName": "Already processed?",
                       "valid": true,
-                      "skip": false,
                       "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                       "settings": {
                         "branches": [
@@ -327,8 +196,7 @@
                             "branchName": "new_call"
                           }
                         ],
-                        "executionType": "EXECUTE_FIRST_MATCH",
-                        "sampleData": {}
+                        "executionType": "EXECUTE_FIRST_MATCH"
                       },
                       "children": [
                         {
@@ -336,7 +204,6 @@
                           "name": "run_summary_dup",
                           "displayName": "Run summary",
                           "valid": true,
-                          "skip": false,
                           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                           "settings": {
                             "sourceCode": {
@@ -348,15 +215,6 @@
                               "candidate": "{{pick_candidate.output.candidate}}",
                               "fingerprint": "{{pick_candidate.output.fingerprint}}",
                               "extraction": "{{parse_extraction.output}}"
-                            },
-                            "sampleData": {},
-                            "errorHandlingOptions": {
-                              "retryOnFailure": {
-                                "value": false
-                              },
-                              "continueOnFailure": {
-                                "value": true
-                              }
                             }
                           },
                           "nextAction": null
@@ -366,7 +224,6 @@
                           "name": "readability_check",
                           "displayName": "Readability check",
                           "valid": true,
-                          "skip": false,
                           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                           "settings": {
                             "sourceCode": {
@@ -375,15 +232,6 @@
                             },
                             "input": {
                               "candidate": "{{pick_candidate.output.candidate}}"
-                            },
-                            "sampleData": {},
-                            "errorHandlingOptions": {
-                              "retryOnFailure": {
-                                "value": false
-                              },
-                              "continueOnFailure": {
-                                "value": true
-                              }
                             }
                           },
                           "nextAction": {
@@ -391,7 +239,6 @@
                             "name": "quality_gate",
                             "displayName": "Readable?",
                             "valid": true,
-                            "skip": false,
                             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                             "settings": {
                               "branches": [
@@ -413,8 +260,7 @@
                                   "branchName": "process"
                                 }
                               ],
-                              "executionType": "EXECUTE_FIRST_MATCH",
-                              "sampleData": {}
+                              "executionType": "EXECUTE_FIRST_MATCH"
                             },
                             "children": [
                               {
@@ -422,33 +268,16 @@
                                 "name": "notify_unreadable",
                                 "displayName": "Notify: could not process",
                                 "valid": true,
-                                "skip": false,
                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                 "settings": {
                                   "pieceName": "@activepieces/piece-slack",
                                   "pieceVersion": "0.17.8",
                                   "actionName": "slack_post_message",
-                                  "propertySettings": {
-                                    "channel": {
-                                      "type": "MANUAL"
-                                    },
-                                    "text": {
-                                      "type": "MANUAL"
-                                    }
-                                  },
+                                  "propertySettings": {},
                                   "input": {
                                     "auth": "{{connections['slack']}}",
                                     "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                     "text": ":warning: *Call transcript could not be processed*\nSource: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.subject}}\nDate: {{pick_candidate.output.candidate.date}}\nThe transcript was empty or unreadable, so nothing was logged and no follow-up was drafted. Please handle this call manually:\n{{pick_candidate.output.candidate.link}}"
-                                  },
-                                  "sampleData": {},
-                                  "errorHandlingOptions": {
-                                    "retryOnFailure": {
-                                      "value": false
-                                    },
-                                    "continueOnFailure": {
-                                      "value": true
-                                    }
                                   }
                                 },
                                 "nextAction": {
@@ -456,29 +285,12 @@
                                   "name": "log_unreadable",
                                   "displayName": "Log unreadable call",
                                   "valid": true,
-                                  "skip": false,
                                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                   "settings": {
                                     "pieceName": "@activepieces/piece-google-sheets",
                                     "pieceVersion": "0.16.7",
                                     "actionName": "sheets_add_row",
-                                    "propertySettings": {
-                                      "spreadsheet_id": {
-                                        "type": "MANUAL"
-                                      },
-                                      "sheet_id": {
-                                        "type": "MANUAL"
-                                      },
-                                      "first_row_headers": {
-                                        "type": "MANUAL"
-                                      },
-                                      "as_string": {
-                                        "type": "MANUAL"
-                                      },
-                                      "values": {
-                                        "type": "MANUAL"
-                                      }
-                                    },
+                                    "propertySettings": {},
                                     "input": {
                                       "auth": "{{connections['googleSheets']}}",
                                       "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -493,15 +305,6 @@
                                         "E": "",
                                         "F": ""
                                       }
-                                    },
-                                    "sampleData": {},
-                                    "errorHandlingOptions": {
-                                      "retryOnFailure": {
-                                        "value": false
-                                      },
-                                      "continueOnFailure": {
-                                        "value": true
-                                      }
                                     }
                                   },
                                   "nextAction": {
@@ -509,7 +312,6 @@
                                     "name": "run_summary_unreadable",
                                     "displayName": "Run summary",
                                     "valid": true,
-                                    "skip": false,
                                     "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                     "settings": {
                                       "sourceCode": {
@@ -521,15 +323,6 @@
                                         "candidate": "{{pick_candidate.output.candidate}}",
                                         "fingerprint": "{{pick_candidate.output.fingerprint}}",
                                         "extraction": "{{parse_extraction.output}}"
-                                      },
-                                      "sampleData": {},
-                                      "errorHandlingOptions": {
-                                        "retryOnFailure": {
-                                          "value": false
-                                        },
-                                        "continueOnFailure": {
-                                          "value": true
-                                        }
                                       }
                                     },
                                     "nextAction": null
@@ -541,35 +334,12 @@
                                 "name": "extract_facts",
                                 "displayName": "Extract call facts (AI)",
                                 "valid": true,
-                                "skip": false,
                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                 "settings": {
                                   "pieceName": "@activepieces/piece-ai",
                                   "pieceVersion": "0.6.0",
                                   "actionName": "askAi",
-                                  "propertySettings": {
-                                    "provider": {
-                                      "type": "MANUAL"
-                                    },
-                                    "model": {
-                                      "type": "MANUAL"
-                                    },
-                                    "prompt": {
-                                      "type": "MANUAL"
-                                    },
-                                    "creativity": {
-                                      "type": "MANUAL"
-                                    },
-                                    "maxOutputTokens": {
-                                      "type": "MANUAL"
-                                    },
-                                    "webSearch": {
-                                      "type": "MANUAL"
-                                    },
-                                    "webSearchOptions": {
-                                      "type": "MANUAL"
-                                    }
-                                  },
+                                  "propertySettings": {},
                                   "input": {
                                     "provider": "activepieces",
                                     "model": "openai/gpt-4o-mini",
@@ -578,15 +348,6 @@
                                     "maxOutputTokens": "2500",
                                     "webSearch": false,
                                     "webSearchOptions": {}
-                                  },
-                                  "sampleData": {},
-                                  "errorHandlingOptions": {
-                                    "retryOnFailure": {
-                                      "value": false
-                                    },
-                                    "continueOnFailure": {
-                                      "value": true
-                                    }
                                   }
                                 },
                                 "nextAction": {
@@ -594,7 +355,6 @@
                                   "name": "parse_extraction",
                                   "displayName": "Parse extraction",
                                   "valid": true,
-                                  "skip": false,
                                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                   "settings": {
                                     "sourceCode": {
@@ -604,15 +364,6 @@
                                     "input": {
                                       "extract_facts": "{{extract_facts.output}}",
                                       "candidate": "{{pick_candidate.output.candidate}}"
-                                    },
-                                    "sampleData": {},
-                                    "errorHandlingOptions": {
-                                      "retryOnFailure": {
-                                        "value": false
-                                      },
-                                      "continueOnFailure": {
-                                        "value": true
-                                      }
                                     }
                                   },
                                   "nextAction": {
@@ -620,7 +371,6 @@
                                     "name": "attendee_gate",
                                     "displayName": "External attendees?",
                                     "valid": true,
-                                    "skip": false,
                                     "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                     "settings": {
                                       "branches": [
@@ -642,8 +392,7 @@
                                           "branchName": "process"
                                         }
                                       ],
-                                      "executionType": "EXECUTE_FIRST_MATCH",
-                                      "sampleData": {}
+                                      "executionType": "EXECUTE_FIRST_MATCH"
                                     },
                                     "children": [
                                       {
@@ -651,29 +400,12 @@
                                         "name": "log_skipped_internal",
                                         "displayName": "Log internal call (skipped)",
                                         "valid": true,
-                                        "skip": false,
                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                         "settings": {
                                           "pieceName": "@activepieces/piece-google-sheets",
                                           "pieceVersion": "0.16.7",
                                           "actionName": "sheets_add_row",
-                                          "propertySettings": {
-                                            "spreadsheet_id": {
-                                              "type": "MANUAL"
-                                            },
-                                            "sheet_id": {
-                                              "type": "MANUAL"
-                                            },
-                                            "first_row_headers": {
-                                              "type": "MANUAL"
-                                            },
-                                            "as_string": {
-                                              "type": "MANUAL"
-                                            },
-                                            "values": {
-                                              "type": "MANUAL"
-                                            }
-                                          },
+                                          "propertySettings": {},
                                           "input": {
                                             "auth": "{{connections['googleSheets']}}",
                                             "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -688,15 +420,6 @@
                                               "E": "",
                                               "F": ""
                                             }
-                                          },
-                                          "sampleData": {},
-                                          "errorHandlingOptions": {
-                                            "retryOnFailure": {
-                                              "value": false
-                                            },
-                                            "continueOnFailure": {
-                                              "value": true
-                                            }
                                           }
                                         },
                                         "nextAction": {
@@ -704,7 +427,6 @@
                                           "name": "run_summary_internal",
                                           "displayName": "Run summary",
                                           "valid": true,
-                                          "skip": false,
                                           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                           "settings": {
                                             "sourceCode": {
@@ -716,15 +438,6 @@
                                               "candidate": "{{pick_candidate.output.candidate}}",
                                               "fingerprint": "{{pick_candidate.output.fingerprint}}",
                                               "extraction": "{{parse_extraction.output}}"
-                                            },
-                                            "sampleData": {},
-                                            "errorHandlingOptions": {
-                                              "retryOnFailure": {
-                                                "value": false
-                                              },
-                                              "continueOnFailure": {
-                                                "value": true
-                                              }
                                             }
                                           },
                                           "nextAction": null
@@ -735,32 +448,12 @@
                                         "name": "match_deal",
                                         "displayName": "Match deal by account",
                                         "valid": true,
-                                        "skip": false,
                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                         "settings": {
                                           "pieceName": "@activepieces/piece-google-sheets",
                                           "pieceVersion": "0.16.7",
                                           "actionName": "sheets_find_rows",
-                                          "propertySettings": {
-                                            "spreadsheet_id": {
-                                              "type": "MANUAL"
-                                            },
-                                            "sheet_id": {
-                                              "type": "MANUAL"
-                                            },
-                                            "column_name": {
-                                              "type": "MANUAL"
-                                            },
-                                            "search_value": {
-                                              "type": "MANUAL"
-                                            },
-                                            "match_case": {
-                                              "type": "MANUAL"
-                                            },
-                                            "number_of_rows": {
-                                              "type": "MANUAL"
-                                            }
-                                          },
+                                          "propertySettings": {},
                                           "input": {
                                             "auth": "{{connections['googleSheets']}}",
                                             "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -769,15 +462,6 @@
                                             "search_value": "{{parse_extraction.output.suggestedAccount}}",
                                             "match_case": false,
                                             "number_of_rows": 1
-                                          },
-                                          "sampleData": {},
-                                          "errorHandlingOptions": {
-                                            "retryOnFailure": {
-                                              "value": false
-                                            },
-                                            "continueOnFailure": {
-                                              "value": true
-                                            }
                                           }
                                         },
                                         "nextAction": {
@@ -785,7 +469,6 @@
                                           "name": "deal_match_check",
                                           "displayName": "Deal match verdict",
                                           "valid": true,
-                                          "skip": false,
                                           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                           "settings": {
                                             "sourceCode": {
@@ -794,15 +477,6 @@
                                             },
                                             "input": {
                                               "match_deal": "{{match_deal.output}}"
-                                            },
-                                            "sampleData": {},
-                                            "errorHandlingOptions": {
-                                              "retryOnFailure": {
-                                                "value": false
-                                              },
-                                              "continueOnFailure": {
-                                                "value": true
-                                              }
                                             }
                                           },
                                           "nextAction": {
@@ -810,7 +484,6 @@
                                             "name": "deal_gate",
                                             "displayName": "Deal matched?",
                                             "valid": true,
-                                            "skip": false,
                                             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                             "settings": {
                                               "branches": [
@@ -832,8 +505,7 @@
                                                   "branchName": "no_match"
                                                 }
                                               ],
-                                              "executionType": "EXECUTE_FIRST_MATCH",
-                                              "sampleData": {}
+                                              "executionType": "EXECUTE_FIRST_MATCH"
                                             },
                                             "children": [
                                               {
@@ -841,7 +513,6 @@
                                                 "name": "pipeline_ctx_match",
                                                 "displayName": "Pipeline context",
                                                 "valid": true,
-                                                "skip": false,
                                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                 "settings": {
                                                   "sourceCode": {
@@ -850,15 +521,6 @@
                                                   },
                                                   "input": {
                                                     "dealRef": "{{deal_match_check.output.dealId}}"
-                                                  },
-                                                  "sampleData": {},
-                                                  "errorHandlingOptions": {
-                                                    "retryOnFailure": {
-                                                      "value": false
-                                                    },
-                                                    "continueOnFailure": {
-                                                      "value": true
-                                                    }
                                                   }
                                                 },
                                                 "nextAction": {
@@ -866,29 +528,12 @@
                                                   "name": "log_call_notes_match",
                                                   "displayName": "Log call notes",
                                                   "valid": true,
-                                                  "skip": false,
                                                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                   "settings": {
                                                     "pieceName": "@activepieces/piece-google-sheets",
                                                     "pieceVersion": "0.16.7",
                                                     "actionName": "sheets_add_row",
-                                                    "propertySettings": {
-                                                      "spreadsheet_id": {
-                                                        "type": "MANUAL"
-                                                      },
-                                                      "sheet_id": {
-                                                        "type": "MANUAL"
-                                                      },
-                                                      "first_row_headers": {
-                                                        "type": "MANUAL"
-                                                      },
-                                                      "as_string": {
-                                                        "type": "MANUAL"
-                                                      },
-                                                      "values": {
-                                                        "type": "MANUAL"
-                                                      }
-                                                    },
+                                                    "propertySettings": {},
                                                     "input": {
                                                       "auth": "{{connections['googleSheets']}}",
                                                       "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -906,15 +551,6 @@
                                                         "H": "{{pick_candidate.output.candidate.source}}",
                                                         "I": "{{pick_candidate.output.candidate.link}}"
                                                       }
-                                                    },
-                                                    "sampleData": {},
-                                                    "errorHandlingOptions": {
-                                                      "retryOnFailure": {
-                                                        "value": false
-                                                      },
-                                                      "continueOnFailure": {
-                                                        "value": true
-                                                      }
                                                     }
                                                   },
                                                   "nextAction": {
@@ -922,46 +558,21 @@
                                                     "name": "loop_tasks_match",
                                                     "displayName": "Log each next step",
                                                     "valid": true,
-                                                    "skip": false,
                                                     "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                     "settings": {
-                                                      "items": "{{parse_extraction.output.tasks}}",
-                                                      "sampleData": {}
+                                                      "items": "{{parse_extraction.output.tasks}}"
                                                     },
                                                     "nextAction": {
                                                       "type": "PIECE",
                                                       "name": "draft_followup_match",
                                                       "displayName": "Draft follow-up email (AI)",
                                                       "valid": true,
-                                                      "skip": false,
                                                       "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                       "settings": {
                                                         "pieceName": "@activepieces/piece-ai",
                                                         "pieceVersion": "0.6.0",
                                                         "actionName": "askAi",
-                                                        "propertySettings": {
-                                                          "provider": {
-                                                            "type": "MANUAL"
-                                                          },
-                                                          "model": {
-                                                            "type": "MANUAL"
-                                                          },
-                                                          "prompt": {
-                                                            "type": "MANUAL"
-                                                          },
-                                                          "creativity": {
-                                                            "type": "MANUAL"
-                                                          },
-                                                          "maxOutputTokens": {
-                                                            "type": "MANUAL"
-                                                          },
-                                                          "webSearch": {
-                                                            "type": "MANUAL"
-                                                          },
-                                                          "webSearchOptions": {
-                                                            "type": "MANUAL"
-                                                          }
-                                                        },
+                                                        "propertySettings": {},
                                                         "input": {
                                                           "provider": "activepieces",
                                                           "model": "openai/gpt-4o-mini",
@@ -970,15 +581,6 @@
                                                           "maxOutputTokens": "1000",
                                                           "webSearch": false,
                                                           "webSearchOptions": {}
-                                                        },
-                                                        "sampleData": {},
-                                                        "errorHandlingOptions": {
-                                                          "retryOnFailure": {
-                                                            "value": false
-                                                          },
-                                                          "continueOnFailure": {
-                                                            "value": true
-                                                          }
                                                         }
                                                       },
                                                       "nextAction": {
@@ -986,7 +588,6 @@
                                                         "name": "parse_draft_match",
                                                         "displayName": "Parse draft",
                                                         "valid": true,
-                                                        "skip": false,
                                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                         "settings": {
                                                           "sourceCode": {
@@ -997,15 +598,6 @@
                                                             "draft_followup": "{{draft_followup_match.output}}",
                                                             "extraction": "{{parse_extraction.output}}",
                                                             "candidate": "{{pick_candidate.output.candidate}}"
-                                                          },
-                                                          "sampleData": {},
-                                                          "errorHandlingOptions": {
-                                                            "retryOnFailure": {
-                                                              "value": false
-                                                            },
-                                                            "continueOnFailure": {
-                                                              "value": true
-                                                            }
                                                           }
                                                         },
                                                         "nextAction": {
@@ -1013,26 +605,12 @@
                                                           "name": "create_draft_match",
                                                           "displayName": "Save draft to Gmail",
                                                           "valid": true,
-                                                          "skip": false,
                                                           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                           "settings": {
                                                             "pieceName": "@activepieces/piece-gmail",
                                                             "pieceVersion": "0.12.10",
                                                             "actionName": "gmail_create_draft",
-                                                            "propertySettings": {
-                                                              "receiver": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "subject": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "body_type": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "body": {
-                                                                "type": "MANUAL"
-                                                              }
-                                                            },
+                                                            "propertySettings": {},
                                                             "input": {
                                                               "auth": "{{connections['gmail']}}",
                                                               "receiver": [
@@ -1041,15 +619,6 @@
                                                               "subject": "{{parse_draft_match.output.emailSubject}}",
                                                               "body_type": "plain_text",
                                                               "body": "{{parse_draft_match.output.emailBody}}"
-                                                            },
-                                                            "sampleData": {},
-                                                            "errorHandlingOptions": {
-                                                              "retryOnFailure": {
-                                                                "value": false
-                                                              },
-                                                              "continueOnFailure": {
-                                                                "value": true
-                                                              }
                                                             }
                                                           },
                                                           "nextAction": {
@@ -1057,33 +626,16 @@
                                                             "name": "post_recap_match",
                                                             "displayName": "Post recap to Slack",
                                                             "valid": true,
-                                                            "skip": false,
                                                             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                             "settings": {
                                                               "pieceName": "@activepieces/piece-slack",
                                                               "pieceVersion": "0.17.8",
                                                               "actionName": "slack_post_message",
-                                                              "propertySettings": {
-                                                                "channel": {
-                                                                  "type": "MANUAL"
-                                                                },
-                                                                "text": {
-                                                                  "type": "MANUAL"
-                                                                }
-                                                              },
+                                                              "propertySettings": {},
                                                               "input": {
                                                                 "auth": "{{connections['slack']}}",
                                                                 "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                                 "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_match.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (saved to your Gmail Drafts, awaiting your approval):\nSubject: {{parse_draft_match.output.emailSubject}}\n\n{{parse_draft_match.output.emailBody}}\n\nNothing sends automatically — approve in Gmail and it goes out."
-                                                              },
-                                                              "sampleData": {},
-                                                              "errorHandlingOptions": {
-                                                                "retryOnFailure": {
-                                                                  "value": false
-                                                                },
-                                                                "continueOnFailure": {
-                                                                  "value": true
-                                                                }
                                                               }
                                                             },
                                                             "nextAction": {
@@ -1091,29 +643,12 @@
                                                               "name": "log_processed_pending_match",
                                                               "displayName": "Mark processed (awaiting approval)",
                                                               "valid": true,
-                                                              "skip": false,
                                                               "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                               "settings": {
                                                                 "pieceName": "@activepieces/piece-google-sheets",
                                                                 "pieceVersion": "0.16.7",
                                                                 "actionName": "sheets_add_row",
-                                                                "propertySettings": {
-                                                                  "spreadsheet_id": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "sheet_id": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "first_row_headers": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "as_string": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "values": {
-                                                                    "type": "MANUAL"
-                                                                  }
-                                                                },
+                                                                "propertySettings": {},
                                                                 "input": {
                                                                   "auth": "{{connections['googleSheets']}}",
                                                                   "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -1128,15 +663,6 @@
                                                                     "E": "{{pipeline_ctx_match.output.dealRef}}",
                                                                     "F": "awaiting_approval"
                                                                   }
-                                                                },
-                                                                "sampleData": {},
-                                                                "errorHandlingOptions": {
-                                                                  "retryOnFailure": {
-                                                                    "value": false
-                                                                  },
-                                                                  "continueOnFailure": {
-                                                                    "value": true
-                                                                  }
                                                                 }
                                                               },
                                                               "nextAction": {
@@ -1144,7 +670,6 @@
                                                                 "name": "run_summary_pending_match",
                                                                 "displayName": "Run summary",
                                                                 "valid": true,
-                                                                "skip": false,
                                                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                 "settings": {
                                                                   "sourceCode": {
@@ -1157,15 +682,6 @@
                                                                     "fingerprint": "{{pick_candidate.output.fingerprint}}",
                                                                     "extraction": "{{parse_extraction.output}}",
                                                                     "draft": "{{parse_draft_match.output}}"
-                                                                  },
-                                                                  "sampleData": {},
-                                                                  "errorHandlingOptions": {
-                                                                    "retryOnFailure": {
-                                                                      "value": false
-                                                                    },
-                                                                    "continueOnFailure": {
-                                                                      "value": true
-                                                                    }
                                                                   }
                                                                 },
                                                                 "nextAction": null
@@ -1180,29 +696,12 @@
                                                       "name": "log_task_row_match",
                                                       "displayName": "Log task",
                                                       "valid": true,
-                                                      "skip": false,
                                                       "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                       "settings": {
                                                         "pieceName": "@activepieces/piece-google-sheets",
                                                         "pieceVersion": "0.16.7",
                                                         "actionName": "sheets_add_row",
-                                                        "propertySettings": {
-                                                          "spreadsheet_id": {
-                                                            "type": "MANUAL"
-                                                          },
-                                                          "sheet_id": {
-                                                            "type": "MANUAL"
-                                                          },
-                                                          "first_row_headers": {
-                                                            "type": "MANUAL"
-                                                          },
-                                                          "as_string": {
-                                                            "type": "MANUAL"
-                                                          },
-                                                          "values": {
-                                                            "type": "MANUAL"
-                                                          }
-                                                        },
+                                                        "propertySettings": {},
                                                         "input": {
                                                           "auth": "{{connections['googleSheets']}}",
                                                           "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -1218,15 +717,6 @@
                                                             "F": "open",
                                                             "G": "{{pick_candidate.output.candidate.id}}"
                                                           }
-                                                        },
-                                                        "sampleData": {},
-                                                        "errorHandlingOptions": {
-                                                          "retryOnFailure": {
-                                                            "value": false
-                                                          },
-                                                          "continueOnFailure": {
-                                                            "value": true
-                                                          }
                                                         }
                                                       },
                                                       "nextAction": null
@@ -1239,33 +729,16 @@
                                                 "name": "deal_notice",
                                                 "displayName": "Post: no deal found",
                                                 "valid": true,
-                                                "skip": false,
                                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                 "settings": {
                                                   "pieceName": "@activepieces/piece-slack",
                                                   "pieceVersion": "0.17.8",
                                                   "actionName": "slack_post_message",
-                                                  "propertySettings": {
-                                                    "channel": {
-                                                      "type": "MANUAL"
-                                                    },
-                                                    "text": {
-                                                      "type": "MANUAL"
-                                                    }
-                                                  },
+                                                  "propertySettings": {},
                                                   "input": {
                                                     "auth": "{{connections['slack']}}",
                                                     "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                     "text": ":thinking_face: No deal found for *{{parse_extraction.output.suggestedAccount}}*\nCall: {{pick_candidate.output.candidate.subject}} ({{pick_candidate.output.candidate.date}})\nExternal attendee: {{parse_extraction.output.externalAttendee}}\nA new deal row is being created — update it in the Deal Tracker if this is wrong."
-                                                  },
-                                                  "sampleData": {},
-                                                  "errorHandlingOptions": {
-                                                    "retryOnFailure": {
-                                                      "value": false
-                                                    },
-                                                    "continueOnFailure": {
-                                                      "value": true
-                                                    }
                                                   }
                                                 },
                                                 "nextAction": {
@@ -1273,7 +746,6 @@
                                                   "name": "deal_decision",
                                                   "displayName": "Decide: create or skip",
                                                   "valid": true,
-                                                  "skip": false,
                                                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                   "settings": {
                                                     "sourceCode": {
@@ -1282,15 +754,6 @@
                                                     },
                                                     "input": {
                                                       "decision": "Create deal"
-                                                    },
-                                                    "sampleData": {},
-                                                    "errorHandlingOptions": {
-                                                      "retryOnFailure": {
-                                                        "value": false
-                                                      },
-                                                      "continueOnFailure": {
-                                                        "value": true
-                                                      }
                                                     }
                                                   },
                                                   "nextAction": {
@@ -1298,7 +761,6 @@
                                                     "name": "deal_choice",
                                                     "displayName": "Create or skip?",
                                                     "valid": true,
-                                                    "skip": false,
                                                     "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                     "settings": {
                                                       "branches": [
@@ -1320,8 +782,7 @@
                                                           "branchName": "skip"
                                                         }
                                                       ],
-                                                      "executionType": "EXECUTE_FIRST_MATCH",
-                                                      "sampleData": {}
+                                                      "executionType": "EXECUTE_FIRST_MATCH"
                                                     },
                                                     "children": [
                                                       {
@@ -1329,52 +790,25 @@
                                                         "name": "new_deal_id",
                                                         "displayName": "New deal id",
                                                         "valid": true,
-                                                        "skip": false,
                                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                         "settings": {
                                                           "sourceCode": {
                                                             "packageJson": "{}",
                                                             "code": "export const code = async () => {\n  return { dealId: 'deal_' + Date.now().toString(36), createdAt: new Date().toISOString() };\n};"
                                                           },
-                                                          "input": {},
-                                                          "sampleData": {},
-                                                          "errorHandlingOptions": {
-                                                            "retryOnFailure": {
-                                                              "value": false
-                                                            },
-                                                            "continueOnFailure": {
-                                                              "value": true
-                                                            }
-                                                          }
+                                                          "input": {}
                                                         },
                                                         "nextAction": {
                                                           "type": "PIECE",
                                                           "name": "create_deal_sheet",
                                                           "displayName": "Create deal row",
                                                           "valid": true,
-                                                          "skip": false,
                                                           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                           "settings": {
                                                             "pieceName": "@activepieces/piece-google-sheets",
                                                             "pieceVersion": "0.16.7",
                                                             "actionName": "sheets_add_row",
-                                                            "propertySettings": {
-                                                              "spreadsheet_id": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "sheet_id": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "first_row_headers": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "as_string": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "values": {
-                                                                "type": "MANUAL"
-                                                              }
-                                                            },
+                                                            "propertySettings": {},
                                                             "input": {
                                                               "auth": "{{connections['googleSheets']}}",
                                                               "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -1392,15 +826,6 @@
                                                                 "H": "{{sweep_window.output.nowIso}}",
                                                                 "I": ""
                                                               }
-                                                            },
-                                                            "sampleData": {},
-                                                            "errorHandlingOptions": {
-                                                              "retryOnFailure": {
-                                                                "value": false
-                                                              },
-                                                              "continueOnFailure": {
-                                                                "value": true
-                                                              }
                                                             }
                                                           },
                                                           "nextAction": {
@@ -1408,7 +833,6 @@
                                                             "name": "pipeline_ctx_create",
                                                             "displayName": "Pipeline context",
                                                             "valid": true,
-                                                            "skip": false,
                                                             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                             "settings": {
                                                               "sourceCode": {
@@ -1417,15 +841,6 @@
                                                               },
                                                               "input": {
                                                                 "dealRef": "{{new_deal_id.output.dealId}}"
-                                                              },
-                                                              "sampleData": {},
-                                                              "errorHandlingOptions": {
-                                                                "retryOnFailure": {
-                                                                  "value": false
-                                                                },
-                                                                "continueOnFailure": {
-                                                                  "value": true
-                                                                }
                                                               }
                                                             },
                                                             "nextAction": {
@@ -1433,29 +848,12 @@
                                                               "name": "log_call_notes_create",
                                                               "displayName": "Log call notes",
                                                               "valid": true,
-                                                              "skip": false,
                                                               "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                               "settings": {
                                                                 "pieceName": "@activepieces/piece-google-sheets",
                                                                 "pieceVersion": "0.16.7",
                                                                 "actionName": "sheets_add_row",
-                                                                "propertySettings": {
-                                                                  "spreadsheet_id": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "sheet_id": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "first_row_headers": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "as_string": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "values": {
-                                                                    "type": "MANUAL"
-                                                                  }
-                                                                },
+                                                                "propertySettings": {},
                                                                 "input": {
                                                                   "auth": "{{connections['googleSheets']}}",
                                                                   "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -1473,15 +871,6 @@
                                                                     "H": "{{pick_candidate.output.candidate.source}}",
                                                                     "I": "{{pick_candidate.output.candidate.link}}"
                                                                   }
-                                                                },
-                                                                "sampleData": {},
-                                                                "errorHandlingOptions": {
-                                                                  "retryOnFailure": {
-                                                                    "value": false
-                                                                  },
-                                                                  "continueOnFailure": {
-                                                                    "value": true
-                                                                  }
                                                                 }
                                                               },
                                                               "nextAction": {
@@ -1489,46 +878,21 @@
                                                                 "name": "loop_tasks_create",
                                                                 "displayName": "Log each next step",
                                                                 "valid": true,
-                                                                "skip": false,
                                                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                 "settings": {
-                                                                  "items": "{{parse_extraction.output.tasks}}",
-                                                                  "sampleData": {}
+                                                                  "items": "{{parse_extraction.output.tasks}}"
                                                                 },
                                                                 "nextAction": {
                                                                   "type": "PIECE",
                                                                   "name": "draft_followup_create",
                                                                   "displayName": "Draft follow-up email (AI)",
                                                                   "valid": true,
-                                                                  "skip": false,
                                                                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                   "settings": {
                                                                     "pieceName": "@activepieces/piece-ai",
                                                                     "pieceVersion": "0.6.0",
                                                                     "actionName": "askAi",
-                                                                    "propertySettings": {
-                                                                      "provider": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "model": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "prompt": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "creativity": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "maxOutputTokens": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "webSearch": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "webSearchOptions": {
-                                                                        "type": "MANUAL"
-                                                                      }
-                                                                    },
+                                                                    "propertySettings": {},
                                                                     "input": {
                                                                       "provider": "activepieces",
                                                                       "model": "openai/gpt-4o-mini",
@@ -1537,15 +901,6 @@
                                                                       "maxOutputTokens": "1000",
                                                                       "webSearch": false,
                                                                       "webSearchOptions": {}
-                                                                    },
-                                                                    "sampleData": {},
-                                                                    "errorHandlingOptions": {
-                                                                      "retryOnFailure": {
-                                                                        "value": false
-                                                                      },
-                                                                      "continueOnFailure": {
-                                                                        "value": true
-                                                                      }
                                                                     }
                                                                   },
                                                                   "nextAction": {
@@ -1553,7 +908,6 @@
                                                                     "name": "parse_draft_create",
                                                                     "displayName": "Parse draft",
                                                                     "valid": true,
-                                                                    "skip": false,
                                                                     "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                     "settings": {
                                                                       "sourceCode": {
@@ -1564,15 +918,6 @@
                                                                         "draft_followup": "{{draft_followup_create.output}}",
                                                                         "extraction": "{{parse_extraction.output}}",
                                                                         "candidate": "{{pick_candidate.output.candidate}}"
-                                                                      },
-                                                                      "sampleData": {},
-                                                                      "errorHandlingOptions": {
-                                                                        "retryOnFailure": {
-                                                                          "value": false
-                                                                        },
-                                                                        "continueOnFailure": {
-                                                                          "value": true
-                                                                        }
                                                                       }
                                                                     },
                                                                     "nextAction": {
@@ -1580,26 +925,12 @@
                                                                       "name": "create_draft_create",
                                                                       "displayName": "Save draft to Gmail",
                                                                       "valid": true,
-                                                                      "skip": false,
                                                                       "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                       "settings": {
                                                                         "pieceName": "@activepieces/piece-gmail",
                                                                         "pieceVersion": "0.12.10",
                                                                         "actionName": "gmail_create_draft",
-                                                                        "propertySettings": {
-                                                                          "receiver": {
-                                                                            "type": "MANUAL"
-                                                                          },
-                                                                          "subject": {
-                                                                            "type": "MANUAL"
-                                                                          },
-                                                                          "body_type": {
-                                                                            "type": "MANUAL"
-                                                                          },
-                                                                          "body": {
-                                                                            "type": "MANUAL"
-                                                                          }
-                                                                        },
+                                                                        "propertySettings": {},
                                                                         "input": {
                                                                           "auth": "{{connections['gmail']}}",
                                                                           "receiver": [
@@ -1608,15 +939,6 @@
                                                                           "subject": "{{parse_draft_create.output.emailSubject}}",
                                                                           "body_type": "plain_text",
                                                                           "body": "{{parse_draft_create.output.emailBody}}"
-                                                                        },
-                                                                        "sampleData": {},
-                                                                        "errorHandlingOptions": {
-                                                                          "retryOnFailure": {
-                                                                            "value": false
-                                                                          },
-                                                                          "continueOnFailure": {
-                                                                            "value": true
-                                                                          }
                                                                         }
                                                                       },
                                                                       "nextAction": {
@@ -1624,33 +946,16 @@
                                                                         "name": "post_recap_create",
                                                                         "displayName": "Post recap to Slack",
                                                                         "valid": true,
-                                                                        "skip": false,
                                                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                         "settings": {
                                                                           "pieceName": "@activepieces/piece-slack",
                                                                           "pieceVersion": "0.17.8",
                                                                           "actionName": "slack_post_message",
-                                                                          "propertySettings": {
-                                                                            "channel": {
-                                                                              "type": "MANUAL"
-                                                                            },
-                                                                            "text": {
-                                                                              "type": "MANUAL"
-                                                                            }
-                                                                          },
+                                                                          "propertySettings": {},
                                                                           "input": {
                                                                             "auth": "{{connections['slack']}}",
                                                                             "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                                             "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_create.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (saved to your Gmail Drafts, awaiting your approval):\nSubject: {{parse_draft_create.output.emailSubject}}\n\n{{parse_draft_create.output.emailBody}}\n\nNothing sends automatically — approve in Gmail and it goes out."
-                                                                          },
-                                                                          "sampleData": {},
-                                                                          "errorHandlingOptions": {
-                                                                            "retryOnFailure": {
-                                                                              "value": false
-                                                                            },
-                                                                            "continueOnFailure": {
-                                                                              "value": true
-                                                                            }
                                                                           }
                                                                         },
                                                                         "nextAction": {
@@ -1658,29 +963,12 @@
                                                                           "name": "log_processed_pending_create",
                                                                           "displayName": "Mark processed (awaiting approval)",
                                                                           "valid": true,
-                                                                          "skip": false,
                                                                           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                           "settings": {
                                                                             "pieceName": "@activepieces/piece-google-sheets",
                                                                             "pieceVersion": "0.16.7",
                                                                             "actionName": "sheets_add_row",
-                                                                            "propertySettings": {
-                                                                              "spreadsheet_id": {
-                                                                                "type": "MANUAL"
-                                                                              },
-                                                                              "sheet_id": {
-                                                                                "type": "MANUAL"
-                                                                              },
-                                                                              "first_row_headers": {
-                                                                                "type": "MANUAL"
-                                                                              },
-                                                                              "as_string": {
-                                                                                "type": "MANUAL"
-                                                                              },
-                                                                              "values": {
-                                                                                "type": "MANUAL"
-                                                                              }
-                                                                            },
+                                                                            "propertySettings": {},
                                                                             "input": {
                                                                               "auth": "{{connections['googleSheets']}}",
                                                                               "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -1695,15 +983,6 @@
                                                                                 "E": "{{pipeline_ctx_create.output.dealRef}}",
                                                                                 "F": "awaiting_approval"
                                                                               }
-                                                                            },
-                                                                            "sampleData": {},
-                                                                            "errorHandlingOptions": {
-                                                                              "retryOnFailure": {
-                                                                                "value": false
-                                                                              },
-                                                                              "continueOnFailure": {
-                                                                                "value": true
-                                                                              }
                                                                             }
                                                                           },
                                                                           "nextAction": {
@@ -1711,7 +990,6 @@
                                                                             "name": "run_summary_pending_create",
                                                                             "displayName": "Run summary",
                                                                             "valid": true,
-                                                                            "skip": false,
                                                                             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                             "settings": {
                                                                               "sourceCode": {
@@ -1724,15 +1002,6 @@
                                                                                 "fingerprint": "{{pick_candidate.output.fingerprint}}",
                                                                                 "extraction": "{{parse_extraction.output}}",
                                                                                 "draft": "{{parse_draft_create.output}}"
-                                                                              },
-                                                                              "sampleData": {},
-                                                                              "errorHandlingOptions": {
-                                                                                "retryOnFailure": {
-                                                                                  "value": false
-                                                                                },
-                                                                                "continueOnFailure": {
-                                                                                  "value": true
-                                                                                }
                                                                               }
                                                                             },
                                                                             "nextAction": null
@@ -1747,29 +1016,12 @@
                                                                   "name": "log_task_row_create",
                                                                   "displayName": "Log task",
                                                                   "valid": true,
-                                                                  "skip": false,
                                                                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                   "settings": {
                                                                     "pieceName": "@activepieces/piece-google-sheets",
                                                                     "pieceVersion": "0.16.7",
                                                                     "actionName": "sheets_add_row",
-                                                                    "propertySettings": {
-                                                                      "spreadsheet_id": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "sheet_id": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "first_row_headers": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "as_string": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "values": {
-                                                                        "type": "MANUAL"
-                                                                      }
-                                                                    },
+                                                                    "propertySettings": {},
                                                                     "input": {
                                                                       "auth": "{{connections['googleSheets']}}",
                                                                       "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -1785,15 +1037,6 @@
                                                                         "F": "open",
                                                                         "G": "{{pick_candidate.output.candidate.id}}"
                                                                       }
-                                                                    },
-                                                                    "sampleData": {},
-                                                                    "errorHandlingOptions": {
-                                                                      "retryOnFailure": {
-                                                                        "value": false
-                                                                      },
-                                                                      "continueOnFailure": {
-                                                                        "value": true
-                                                                      }
                                                                     }
                                                                   },
                                                                   "nextAction": null
@@ -1808,7 +1051,6 @@
                                                         "name": "pipeline_ctx_skip",
                                                         "displayName": "Pipeline context",
                                                         "valid": true,
-                                                        "skip": false,
                                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                         "settings": {
                                                           "sourceCode": {
@@ -1817,15 +1059,6 @@
                                                           },
                                                           "input": {
                                                             "dealRef": "{{parse_extraction.output.suggestedAccount}}"
-                                                          },
-                                                          "sampleData": {},
-                                                          "errorHandlingOptions": {
-                                                            "retryOnFailure": {
-                                                              "value": false
-                                                            },
-                                                            "continueOnFailure": {
-                                                              "value": true
-                                                            }
                                                           }
                                                         },
                                                         "nextAction": {
@@ -1833,29 +1066,12 @@
                                                           "name": "log_call_notes_skip",
                                                           "displayName": "Log call notes",
                                                           "valid": true,
-                                                          "skip": false,
                                                           "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                           "settings": {
                                                             "pieceName": "@activepieces/piece-google-sheets",
                                                             "pieceVersion": "0.16.7",
                                                             "actionName": "sheets_add_row",
-                                                            "propertySettings": {
-                                                              "spreadsheet_id": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "sheet_id": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "first_row_headers": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "as_string": {
-                                                                "type": "MANUAL"
-                                                              },
-                                                              "values": {
-                                                                "type": "MANUAL"
-                                                              }
-                                                            },
+                                                            "propertySettings": {},
                                                             "input": {
                                                               "auth": "{{connections['googleSheets']}}",
                                                               "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -1873,15 +1089,6 @@
                                                                 "H": "{{pick_candidate.output.candidate.source}}",
                                                                 "I": "{{pick_candidate.output.candidate.link}}"
                                                               }
-                                                            },
-                                                            "sampleData": {},
-                                                            "errorHandlingOptions": {
-                                                              "retryOnFailure": {
-                                                                "value": false
-                                                              },
-                                                              "continueOnFailure": {
-                                                                "value": true
-                                                              }
                                                             }
                                                           },
                                                           "nextAction": {
@@ -1889,46 +1096,21 @@
                                                             "name": "loop_tasks_skip",
                                                             "displayName": "Log each next step",
                                                             "valid": true,
-                                                            "skip": false,
                                                             "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                             "settings": {
-                                                              "items": "{{parse_extraction.output.tasks}}",
-                                                              "sampleData": {}
+                                                              "items": "{{parse_extraction.output.tasks}}"
                                                             },
                                                             "nextAction": {
                                                               "type": "PIECE",
                                                               "name": "draft_followup_skip",
                                                               "displayName": "Draft follow-up email (AI)",
                                                               "valid": true,
-                                                              "skip": false,
                                                               "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                               "settings": {
                                                                 "pieceName": "@activepieces/piece-ai",
                                                                 "pieceVersion": "0.6.0",
                                                                 "actionName": "askAi",
-                                                                "propertySettings": {
-                                                                  "provider": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "model": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "prompt": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "creativity": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "maxOutputTokens": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "webSearch": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "webSearchOptions": {
-                                                                    "type": "MANUAL"
-                                                                  }
-                                                                },
+                                                                "propertySettings": {},
                                                                 "input": {
                                                                   "provider": "activepieces",
                                                                   "model": "openai/gpt-4o-mini",
@@ -1937,15 +1119,6 @@
                                                                   "maxOutputTokens": "1000",
                                                                   "webSearch": false,
                                                                   "webSearchOptions": {}
-                                                                },
-                                                                "sampleData": {},
-                                                                "errorHandlingOptions": {
-                                                                  "retryOnFailure": {
-                                                                    "value": false
-                                                                  },
-                                                                  "continueOnFailure": {
-                                                                    "value": true
-                                                                  }
                                                                 }
                                                               },
                                                               "nextAction": {
@@ -1953,7 +1126,6 @@
                                                                 "name": "parse_draft_skip",
                                                                 "displayName": "Parse draft",
                                                                 "valid": true,
-                                                                "skip": false,
                                                                 "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                 "settings": {
                                                                   "sourceCode": {
@@ -1964,15 +1136,6 @@
                                                                     "draft_followup": "{{draft_followup_skip.output}}",
                                                                     "extraction": "{{parse_extraction.output}}",
                                                                     "candidate": "{{pick_candidate.output.candidate}}"
-                                                                  },
-                                                                  "sampleData": {},
-                                                                  "errorHandlingOptions": {
-                                                                    "retryOnFailure": {
-                                                                      "value": false
-                                                                    },
-                                                                    "continueOnFailure": {
-                                                                      "value": true
-                                                                    }
                                                                   }
                                                                 },
                                                                 "nextAction": {
@@ -1980,26 +1143,12 @@
                                                                   "name": "create_draft_skip",
                                                                   "displayName": "Save draft to Gmail",
                                                                   "valid": true,
-                                                                  "skip": false,
                                                                   "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                   "settings": {
                                                                     "pieceName": "@activepieces/piece-gmail",
                                                                     "pieceVersion": "0.12.10",
                                                                     "actionName": "gmail_create_draft",
-                                                                    "propertySettings": {
-                                                                      "receiver": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "subject": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "body_type": {
-                                                                        "type": "MANUAL"
-                                                                      },
-                                                                      "body": {
-                                                                        "type": "MANUAL"
-                                                                      }
-                                                                    },
+                                                                    "propertySettings": {},
                                                                     "input": {
                                                                       "auth": "{{connections['gmail']}}",
                                                                       "receiver": [
@@ -2008,15 +1157,6 @@
                                                                       "subject": "{{parse_draft_skip.output.emailSubject}}",
                                                                       "body_type": "plain_text",
                                                                       "body": "{{parse_draft_skip.output.emailBody}}"
-                                                                    },
-                                                                    "sampleData": {},
-                                                                    "errorHandlingOptions": {
-                                                                      "retryOnFailure": {
-                                                                        "value": false
-                                                                      },
-                                                                      "continueOnFailure": {
-                                                                        "value": true
-                                                                      }
                                                                     }
                                                                   },
                                                                   "nextAction": {
@@ -2024,33 +1164,16 @@
                                                                     "name": "post_recap_skip",
                                                                     "displayName": "Post recap to Slack",
                                                                     "valid": true,
-                                                                    "skip": false,
                                                                     "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                     "settings": {
                                                                       "pieceName": "@activepieces/piece-slack",
                                                                       "pieceVersion": "0.17.8",
                                                                       "actionName": "slack_post_message",
-                                                                      "propertySettings": {
-                                                                        "channel": {
-                                                                          "type": "MANUAL"
-                                                                        },
-                                                                        "text": {
-                                                                          "type": "MANUAL"
-                                                                        }
-                                                                      },
+                                                                      "propertySettings": {},
                                                                       "input": {
                                                                         "auth": "{{connections['slack']}}",
                                                                         "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
                                                                         "text": ":white_check_mark: *Call logged — {{pick_candidate.output.candidate.subject}}*\n• Source: {{pick_candidate.output.candidate.source}} · {{pick_candidate.output.candidate.date}}\n• Deal: {{pipeline_ctx_skip.output.dealRef}}\n• Summary: {{parse_extraction.output.summary}}\n• Objections: {{parse_extraction.output.objections}}\n• Commitments: {{parse_extraction.output.commitments}}\n• Stage signal: {{parse_extraction.output.stageSignal}}\n• Tasks: {{parse_extraction.output.tasks}}\n• Transcript: {{pick_candidate.output.candidate.link}}\n\n*Follow-up draft* (saved to your Gmail Drafts, awaiting your approval):\nSubject: {{parse_draft_skip.output.emailSubject}}\n\n{{parse_draft_skip.output.emailBody}}\n\nNothing sends automatically — approve in Gmail and it goes out."
-                                                                      },
-                                                                      "sampleData": {},
-                                                                      "errorHandlingOptions": {
-                                                                        "retryOnFailure": {
-                                                                          "value": false
-                                                                        },
-                                                                        "continueOnFailure": {
-                                                                          "value": true
-                                                                        }
                                                                       }
                                                                     },
                                                                     "nextAction": {
@@ -2058,29 +1181,12 @@
                                                                       "name": "log_processed_pending_skip",
                                                                       "displayName": "Mark processed (awaiting approval)",
                                                                       "valid": true,
-                                                                      "skip": false,
                                                                       "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                       "settings": {
                                                                         "pieceName": "@activepieces/piece-google-sheets",
                                                                         "pieceVersion": "0.16.7",
                                                                         "actionName": "sheets_add_row",
-                                                                        "propertySettings": {
-                                                                          "spreadsheet_id": {
-                                                                            "type": "MANUAL"
-                                                                          },
-                                                                          "sheet_id": {
-                                                                            "type": "MANUAL"
-                                                                          },
-                                                                          "first_row_headers": {
-                                                                            "type": "MANUAL"
-                                                                          },
-                                                                          "as_string": {
-                                                                            "type": "MANUAL"
-                                                                          },
-                                                                          "values": {
-                                                                            "type": "MANUAL"
-                                                                          }
-                                                                        },
+                                                                        "propertySettings": {},
                                                                         "input": {
                                                                           "auth": "{{connections['googleSheets']}}",
                                                                           "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -2095,15 +1201,6 @@
                                                                             "E": "{{pipeline_ctx_skip.output.dealRef}}",
                                                                             "F": "awaiting_approval"
                                                                           }
-                                                                        },
-                                                                        "sampleData": {},
-                                                                        "errorHandlingOptions": {
-                                                                          "retryOnFailure": {
-                                                                            "value": false
-                                                                          },
-                                                                          "continueOnFailure": {
-                                                                            "value": true
-                                                                          }
                                                                         }
                                                                       },
                                                                       "nextAction": {
@@ -2111,7 +1208,6 @@
                                                                         "name": "run_summary_pending_skip",
                                                                         "displayName": "Run summary",
                                                                         "valid": true,
-                                                                        "skip": false,
                                                                         "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                                         "settings": {
                                                                           "sourceCode": {
@@ -2124,15 +1220,6 @@
                                                                             "fingerprint": "{{pick_candidate.output.fingerprint}}",
                                                                             "extraction": "{{parse_extraction.output}}",
                                                                             "draft": "{{parse_draft_skip.output}}"
-                                                                          },
-                                                                          "sampleData": {},
-                                                                          "errorHandlingOptions": {
-                                                                            "retryOnFailure": {
-                                                                              "value": false
-                                                                            },
-                                                                            "continueOnFailure": {
-                                                                              "value": true
-                                                                            }
                                                                           }
                                                                         },
                                                                         "nextAction": null
@@ -2147,29 +1234,12 @@
                                                               "name": "log_task_row_skip",
                                                               "displayName": "Log task",
                                                               "valid": true,
-                                                              "skip": false,
                                                               "lastUpdatedDate": "2026-08-12T00:00:00.000Z",
                                                               "settings": {
                                                                 "pieceName": "@activepieces/piece-google-sheets",
                                                                 "pieceVersion": "0.16.7",
                                                                 "actionName": "sheets_add_row",
-                                                                "propertySettings": {
-                                                                  "spreadsheet_id": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "sheet_id": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "first_row_headers": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "as_string": {
-                                                                    "type": "MANUAL"
-                                                                  },
-                                                                  "values": {
-                                                                    "type": "MANUAL"
-                                                                  }
-                                                                },
+                                                                "propertySettings": {},
                                                                 "input": {
                                                                   "auth": "{{connections['googleSheets']}}",
                                                                   "spreadsheet_id": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
@@ -2184,15 +1254,6 @@
                                                                     "E": "{{loop_tasks_skip.output.item.dueDate}}",
                                                                     "F": "open",
                                                                     "G": "{{pick_candidate.output.candidate.id}}"
-                                                                  }
-                                                                },
-                                                                "sampleData": {},
-                                                                "errorHandlingOptions": {
-                                                                  "retryOnFailure": {
-                                                                    "value": false
-                                                                  },
-                                                                  "continueOnFailure": {
-                                                                    "value": true
                                                                   }
                                                                 }
                                                               },
@@ -2234,11 +1295,5 @@
     }
   },
   "valid": true,
-  "schemaVersion": "22",
-  "state": "DRAFT",
-  "connectionIds": [],
-  "agentIds": [],
-  "notes": [],
-  "created": "2026-08-12T00:00:00.000Z",
-  "updated": "2026-08-12T00:00:00.000Z"
+  "schemaVersion": "22"
 }

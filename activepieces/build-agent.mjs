@@ -110,23 +110,44 @@ function apId(label) {
 // Step constructors (match FlowTrigger / FlowAction zod schemas)
 // ---------------------------------------------------------------------------
 
-// Steps match real ActivePieces exports: `skip: false`, `sampleData: {}` on
-// every step, `propertySettings` populated per non-auth input key, and both
-// error-handling flags. Continue-on-failure on every action step: the engine
+// TWO export shapes, both generated from the same step-building code:
+//
+//  - BARE (default, BARE=1): mirrors the shape of the minimal flow that the
+//    bounty platform demonstrably accepted AND ran (a schedule trigger + a
+//    bare code step). Steps carry only the core keys (type/name/displayName/
+//    valid/lastUpdatedDate/settings/nextAction), `propertySettings` is empty
+//    `{}`, and the flow object carries ONLY type/displayName/description/
+//    valid/schemaVersion/trigger — no `id`, `state`, `connectionIds`,
+//    `agentIds`, `notes`, `created`, `updated`, and no `skip`/`sampleData`/
+//    `errorHandlingOptions` on steps. The platform's runner repeatedly
+//    reported "didn't run successfully / No output" for the fully-decorated
+//    export (which real ActivePieces tolerates but a stricter fork may reject
+//    at load), while the bare shape ran. BARE keeps the export a strict
+//    subset of the shared schemas, so it also imports into real ActivePieces.
+//
+//  - DECORATED (BARE=0): the fully-aligned export (skip: false, sampleData:
+//    {}, populated propertySettings, continueOnFailure on every action step,
+//    notes: [] on the flow) matching current real ActivePieces template
+//    exports, for use when the target is stock ActivePieces.
+const BARE = process.env.BARE !== '0'
+
+// In DECORATED mode, continue-on-failure on every action step: the engine
 // resets the run verdict to RUNNING when a step fails with this flag set, so a
 // bare run in an environment without connections/placeholders completes
-// instead of aborting (which the bounty platform reports as "agent didn't run
-// successfully"). When connections and the REPLACE_* placeholders are
+// instead of aborting. When connections and the REPLACE_* placeholders are
 // configured, the steps succeed and this flag is inert.
-const ERROR_HANDLING = {
-  errorHandlingOptions: {
-    retryOnFailure: { value: false },
-    continueOnFailure: { value: true },
-  },
-}
+const ERROR_HANDLING = BARE
+  ? {}
+  : {
+      errorHandlingOptions: {
+        retryOnFailure: { value: false },
+        continueOnFailure: { value: true },
+      },
+    }
 
-/** propertySettings like a real export: one MANUAL entry per non-auth input. */
+/** propertySettings: empty {} in BARE mode, one MANUAL entry per non-auth input otherwise. */
 function manualSettings(input) {
+  if (BARE) return {}
   return Object.fromEntries(
     Object.keys(input ?? {})
       .filter((k) => !k.startsWith('auth'))
@@ -147,7 +168,7 @@ function pieceTrigger({ name, displayName, piece, triggerName, input }) {
       triggerName,
       propertySettings: manualSettings(input),
       input,
-      sampleData: {},
+      ...(BARE ? {} : { sampleData: {} }),
     },
     nextAction: null,
   }
@@ -159,7 +180,7 @@ function pieceAction({ name, displayName, piece, actionName, input }) {
     name,
     displayName,
     valid: true,
-    skip: false,
+    ...(BARE ? {} : { skip: false }),
     lastUpdatedDate: TS,
     settings: {
       pieceName: `@activepieces/piece-${piece}`,
@@ -167,7 +188,7 @@ function pieceAction({ name, displayName, piece, actionName, input }) {
       actionName,
       propertySettings: manualSettings(input),
       input,
-      sampleData: {},
+      ...(BARE ? {} : { sampleData: {} }),
       ...ERROR_HANDLING,
     },
     nextAction: null,
@@ -180,9 +201,14 @@ function codeAction({ name, displayName, code, input = {} }) {
     name,
     displayName,
     valid: true,
-    skip: false,
+    ...(BARE ? {} : { skip: false }),
     lastUpdatedDate: TS,
-    settings: { sourceCode: { packageJson: '{}', code }, input, sampleData: {}, ...ERROR_HANDLING },
+    settings: {
+      sourceCode: { packageJson: '{}', code },
+      input,
+      ...(BARE ? {} : { sampleData: {} }),
+      ...ERROR_HANDLING,
+    },
     nextAction: null,
   }
 }
@@ -193,9 +219,9 @@ function loopAction({ name, displayName, items }) {
     name,
     displayName,
     valid: true,
-    skip: false,
+    ...(BARE ? {} : { skip: false }),
     lastUpdatedDate: TS,
-    settings: { items, sampleData: {} },
+    settings: { items, ...(BARE ? {} : { sampleData: {} }) },
     nextAction: null,
     firstLoopAction: null,
   }
@@ -212,12 +238,12 @@ function routerAction({ name, displayName, branches }) {
     name,
     displayName,
     valid: true,
-    skip: false,
+    ...(BARE ? {} : { skip: false }),
     lastUpdatedDate: TS,
     settings: {
       branches: branches.map(({ head, ...branch }) => branch),
       executionType: 'EXECUTE_FIRST_MATCH',
-      sampleData: {},
+      ...(BARE ? {} : { sampleData: {} }),
     },
     children: branches.map((b) => b.head ?? null),
     nextAction: null,
@@ -911,6 +937,21 @@ function buildFlow() {
     candidateGate,
   ])
 
+  // BARE mode: emit ONLY the keys the proven-working minimal flow carried
+  // (type/displayName/description/valid/schemaVersion/trigger). No id, flowId,
+  // state, connectionIds, agentIds, notes, created, updated — a stricter fork
+  // runner rejected the fully-decorated flow at run time ("No output").
+  if (BARE) {
+    return {
+      type: 'FLOW_VERSION',
+      displayName: FLOW_DISPLAY_NAME,
+      description: 'Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail (and Drive) transcript sources, fingerprint dedup, AI extraction with guardrails, Slack recap + one-tap approval for the follow-up email, all writes landing in a Deal Tracker sheet.',
+      trigger,
+      valid: true,
+      schemaVersion: SCHEMA_VERSION,
+    }
+  }
+
   return {
     type: 'FLOW_VERSION',
     id: apId('sales-call-logger-flow-version'),
@@ -1156,8 +1197,8 @@ const flowsPath = join(ROOT, NO_AI ? 'flows-noai.json' : 'flows.json')
 // exactly the template shape avoids surprises for servers that read fields
 // directly instead of going through zod.
 const { id: _id, flowId: _flowId, state: _state, connectionIds: _cids, agentIds: _aids, created: _created, updated: _updated, ...templateFlow } = flow
-// Real template exports carry notes: [] on the flow — include it.
-if (!templateFlow.notes) templateFlow.notes = []
+// Real template exports carry notes: [] on the flow — include it (decorated mode).
+if (!BARE && !templateFlow.notes) templateFlow.notes = []
 const template = {
   name: FLOW_DISPLAY_NAME,
   type: 'SHARED',
