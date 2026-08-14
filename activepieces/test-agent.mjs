@@ -2,7 +2,8 @@
 /**
  * test-agent.mjs
  *
- * Executes every code step embedded in agent.json against realistic mock
+ * Executes every code step embedded in agent-full.json (the full integration
+ * build with pieces/routers/loops) against realistic mock
  * inputs and asserts the PRD guardrails (fingerprint dedup, newest-first
  * picking, teaser rejection, verbatim extraction, "Not specified" dates,
  * internal-call detection, safe non-JSON degradation, draft parsing).
@@ -16,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const flow = JSON.parse(readFileSync(join(ROOT, 'agent.json'), 'utf8'))
+const flow = JSON.parse(readFileSync(join(ROOT, 'agent-full.json'), 'utf8'))
 
 let failures = 0
 const seen = new Set()

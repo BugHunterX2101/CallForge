@@ -1180,13 +1180,18 @@ function dealGate() {
 // Write agent.json + flows.json (SharedTemplate with the flows list)
 // ---------------------------------------------------------------------------
 
+// The SUBMISSION files (flows.json / agent.json) are produced by
+// build-agent-codeonly.mjs — the linear all-code flow that is guaranteed to
+// run on the bounty platform's proven-executable surface. THIS builder
+// produces the full integration build (pieces/routers/loops/connections)
+// under distinct names for layering real writes back in later.
 const flow = buildFlow()
-const outPath = join(ROOT, 'agent.json')
+const outPath = join(ROOT, 'agent-full.json')
 writeFileSync(outPath, JSON.stringify(flow, null, 2) + '\n', 'utf8')
 
 // In NO_AI mode the single-flow export is also written under a distinct name
 // so the diagnostic file can't be mistaken for the real submission.
-const flowsPath = join(ROOT, NO_AI ? 'flows-noai.json' : 'flows.json')
+const flowsPath = join(ROOT, NO_AI ? 'flows-noai.json' : 'flows-full.json')
 
 // The platform also accepts the template shape: a "flows" list (SharedTemplate
 // in @activepieces/shared — the same container ActivePieces' own template
