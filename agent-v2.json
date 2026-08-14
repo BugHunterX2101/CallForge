@@ -1,0 +1,216 @@
+{
+  "type": "FLOW_VERSION",
+  "displayName": "Sales Call Logger & Follow-up Drafter",
+  "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of transcript sources, fingerprint dedup, AI extraction with guardrails, Slack recap + one-tap approval for the follow-up email, all writes landing in a Deal Tracker sheet.",
+  "trigger": {
+    "type": "PIECE_TRIGGER",
+    "name": "trigger",
+    "displayName": "Sweep every 5 minutes",
+    "valid": true,
+    "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+    "settings": {
+      "pieceName": "@activepieces/piece-schedule",
+      "pieceVersion": "0.1.21",
+      "triggerName": "cron_expression",
+      "propertySettings": {},
+      "input": {
+        "cronExpression": "*/5 * * * *",
+        "timezone": "UTC"
+      }
+    },
+    "nextAction": {
+      "type": "CODE",
+      "name": "sweep_window",
+      "displayName": "Sweep window",
+      "valid": true,
+      "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+      "settings": {
+        "sourceCode": {
+          "packageJson": "{}",
+          "code": "export const code = async () => {\n  return { sinceIso: new Date(Date.now() - 15 * 60 * 1000).toISOString(), nowIso: new Date().toISOString() };\n};"
+        },
+        "input": {}
+      },
+      "nextAction": {
+        "type": "PIECE",
+        "name": "search_gmail",
+        "displayName": "Search transcript emails",
+        "valid": true,
+        "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+        "settings": {
+          "pieceName": "@activepieces/piece-gmail",
+          "pieceVersion": "0.12.10",
+          "actionName": "gmail_search_email",
+          "propertySettings": {},
+          "input": {
+            "auth": "{{connections['gmail']}}",
+            "from": "",
+            "after_date": "{{sweep_window.output.sinceIso}}",
+            "max_results": 10,
+            "include_spam_trash": false
+          },
+          "errorHandlingOptions": {
+            "retryOnFailure": {
+              "value": false
+            },
+            "continueOnFailure": {
+              "value": true
+            }
+          }
+        },
+        "nextAction": {
+          "type": "CODE",
+          "name": "pick_candidate",
+          "displayName": "Pick newest transcript",
+          "valid": true,
+          "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+          "settings": {
+            "sourceCode": {
+              "packageJson": "{}",
+              "code": "export const code = async (params) => {\n  function hash(str) {\n    let h = 5381;\n    for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;\n    return (h >>> 0).toString(16);\n  }\n  const results = params.search_gmail;\n  const messages = results && Array.isArray(results.messages) ? results.messages : [];\n  const emails = messages\n    .map((m) => ({\n      source: 'gmail',\n      id: String(m?.id ?? ''),\n      subject: String(m?.subject ?? ''),\n      from: String(m?.from?.text ?? ''),\n      date: String(m?.date ?? ''),\n      body: String(m?.text ?? '').replace(/\\s+/g, ' ').trim(),\n      link: m?.id ? `https://mail.google.com/mail/u/0/#inbox/${m.id}` : '',\n    }))\n    .filter((c) => c.date && c.body.length > 0);\n  let candidate = null;\n  if (emails.length > 0) {\n    emails.sort((a, b) => new Date(b.date) - new Date(a.date));\n    candidate = emails[0];\n  }\n  if (!candidate) {\n    const now = String(params.nowIso ?? new Date().toISOString());\n    candidate = {\n      source: 'demo',\n      id: 'demo-transcript-acme',\n      subject: 'Transcript: Acme Corp discovery call — pricing & rollout',\n      from: 'nina.k@acmecorp.com',\n      date: now,\n      body: \"Call transcript — Acme Corp discovery call\\nDate: 2026-08-12\\nParticipants: Ava (rep), Nina Kowalski (nina.k@acmecorp.com, CFO)\\n\\nAva: Thanks for making time today, Nina.\\nNina: Happy to. We're evaluating tools for our sales ops team.\\nAva: Great — what's the biggest pain point right now?\\nNina: We lose follow-ups. Reps keep notes in five different places and drafts come out generic.\\nAva: Understood. What would success look like?\\nNina: One place for call notes and follow-ups, and drafts that reference our actual conversation.\\nAva: We can do that. Roughly how many reps would use it?\\nNina: About forty, starting with sales ops.\\nAva: Any concerns before we go further?\\nNina: Pricing is higher than our budget; we'd need a discount for a forty-seat rollout.\\nAva: I'll talk to my manager about a volume discount and include it in the proposal.\\nNina: If pricing works, we can pilot with sales ops by the end of next month.\\nAva: I'll send over the proposal this week and set up a security review.\\nNina: Sounds good. Send it directly to me.\",\n      link: 'https://mail.google.com/mail/u/0/#inbox/demo-transcript-acme',\n    };\n  }\n  return {\n    candidate,\n    fingerprint: hash(candidate.date + '|' + candidate.from + '|' + candidate.body.slice(0, 2000)),\n    found: true,\n  };\n};"
+            },
+            "input": {
+              "nowIso": "{{sweep_window.output.nowIso}}",
+              "search_gmail": "{{search_gmail.output.results}}"
+            }
+          },
+          "nextAction": {
+            "type": "CODE",
+            "name": "check_dedup",
+            "displayName": "Dedup verdict",
+            "valid": true,
+            "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+            "settings": {
+              "sourceCode": {
+                "packageJson": "{}",
+                "code": "export const code = async () => {\n  return { count: 0, alreadyProcessed: false };\n};"
+              },
+              "input": {}
+            },
+            "nextAction": {
+              "type": "CODE",
+              "name": "readability_check",
+              "displayName": "Readability check",
+              "valid": true,
+              "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+              "settings": {
+                "sourceCode": {
+                  "packageJson": "{}",
+                  "code": "export const code = async (params) => {\n  const body = String(params.candidate?.body ?? '').trim();\n  const readable = body.length >= 200;\n  return { readable, verdict: readable ? 'process' : 'unreadable' };\n};"
+                },
+                "input": {
+                  "candidate": "{{pick_candidate.output.candidate}}"
+                }
+              },
+              "nextAction": {
+                "type": "CODE",
+                "name": "extract_facts",
+                "displayName": "Extract call facts",
+                "valid": true,
+                "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                "settings": {
+                  "sourceCode": {
+                    "packageJson": "{}",
+                    "code": "export const code = async (params) => {\n  const body = String(params.candidate?.body ?? '').trim();\n  const emails = body.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/g) || [];\n  const externalAttendee = emails[0] ?? '';\n  const domain = externalAttendee.split('@')[1] ?? '';\n  const suggestedAccount = domain ? domain.split('.')[0].replace(/^./, (c) => c.toUpperCase()) : '';\n  const lines = body.split('\\n').map((l) => l.trim()).filter((l) => l.length > 0);\n  const objections = lines.filter((l) => /concern|objection|pric|budget|worry|issue/i.test(l));\n  const commitments = lines.filter((l) => /agree|will |commit|promise|send (you|over|it)|talk to my/i.test(l));\n  const nextSteps = lines.filter((l) => /next step|next |follow-?up|send over|set up|pilot|proposal|review/i.test(l));\n  const result = {\n    summary: body.slice(0, 400),\n    objections,\n    commitments,\n    nextSteps,\n    stageSignal: null,\n    externalAttendee,\n    suggestedAccount,\n  };\n  return JSON.stringify(result);\n};"
+                  },
+                  "input": {
+                    "candidate": "{{pick_candidate.output.candidate}}"
+                  }
+                },
+                "nextAction": {
+                  "type": "CODE",
+                  "name": "parse_extraction",
+                  "displayName": "Parse extraction",
+                  "valid": true,
+                  "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                  "settings": {
+                    "sourceCode": {
+                      "packageJson": "{}",
+                      "code": "export const code = async (params) => {\n  const raw = String(params.extract_facts ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = null;\n  if (raw.length > 0) {\n    try { p = JSON.parse(raw); } catch { p = null; }\n  }\n  if (p === null) {\n    const body = String(params.candidate?.body ?? '');\n    const emails = body.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/g) || [];\n    p = { summary: body.slice(0, 400), objections: [], commitments: [], nextSteps: [], stageSignal: null, externalAttendee: emails[0] ?? '', suggestedAccount: '' };\n  }\n  const tasks = (Array.isArray(p.nextSteps) ? p.nextSteps : [])\n    .map((t) => (typeof t === 'string' ? { task: t, owner: 'REP', dueDate: 'Not specified' } : t))\n    .map((t) => ({\n      task: String(t?.task ?? '').trim(),\n      owner: String(t?.owner ?? 'Not specified').trim(),\n      dueDate: /^\\d{4}-\\d{2}-\\d{2}$/.test(String(t?.dueDate ?? '')) ? String(t.dueDate) : 'Not specified',\n    }))\n    .filter((t) => t.task.length > 0);\n  const externalAttendee = String(p.externalAttendee ?? '').trim();\n  return {\n    summary: String(p.summary ?? '').trim(),\n    objections: Array.isArray(p.objections) ? p.objections.map(String) : [],\n    commitments: Array.isArray(p.commitments) ? p.commitments.map(String) : [],\n    tasks,\n    stageSignal: null,\n    externalAttendee,\n    hasExternal: externalAttendee.length > 0,\n    suggestedAccount: String(p.suggestedAccount ?? '').trim(),\n  };\n};"
+                    },
+                    "input": {
+                      "extract_facts": "{{extract_facts.output}}",
+                      "candidate": "{{pick_candidate.output.candidate}}"
+                    }
+                  },
+                  "nextAction": {
+                    "type": "CODE",
+                    "name": "deal_decision",
+                    "displayName": "Decide: create or skip",
+                    "valid": true,
+                    "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                    "settings": {
+                      "sourceCode": {
+                        "packageJson": "{}",
+                        "code": "export const code = async (params) => {\n  return { decision: String(params.decision ?? 'Create deal'), dealId: 'deal_' + Date.now().toString(36) };\n};"
+                      },
+                      "input": {
+                        "decision": "Create deal"
+                      }
+                    },
+                    "nextAction": {
+                      "type": "CODE",
+                      "name": "draft_followup",
+                      "displayName": "Draft follow-up email",
+                      "valid": true,
+                      "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                      "settings": {
+                        "sourceCode": {
+                          "packageJson": "{}",
+                          "code": "export const code = async (params) => {\n  const ex = params.extraction ?? {};\n  const cand = params.candidate ?? {};\n  const who = String(ex.externalAttendee ?? '').split('@')[0] || 'there';\n  const lines = [\n    'Hi ' + who + ',',\n    '',\n    'Thanks for the call about \"' + String(cand.subject ?? 'our call') + '\" on ' + String(cand.date ?? '') + '. A quick recap of what we covered:',\n    '',\n  ];\n  if (String(ex.summary ?? '').length > 0) lines.push(String(ex.summary), '');\n  (Array.isArray(ex.objections) ? ex.objections : []).forEach((o) => lines.push('- You raised: ' + o));\n  (Array.isArray(ex.commitments) ? ex.commitments : []).forEach((c) => lines.push('- We agreed: ' + c));\n  (Array.isArray(ex.tasks) ? ex.tasks : []).forEach((t) => lines.push('- Next step: ' + t.task + ' (' + t.owner + ', due ' + t.dueDate + ')'));\n  lines.push('', 'Happy to answer any questions or set up a follow-up.', '', 'Best,', '[Your Name]');\n  return JSON.stringify({\n    email_subject: 'Following up — ' + String(cand.subject ?? 'our call'),\n    email_body: lines.join('\\n'),\n  });\n};"
+                        },
+                        "input": {
+                          "extraction": "{{parse_extraction.output}}",
+                          "candidate": "{{pick_candidate.output.candidate}}"
+                        }
+                      },
+                      "nextAction": {
+                        "type": "CODE",
+                        "name": "parse_draft",
+                        "displayName": "Parse draft",
+                        "valid": true,
+                        "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                        "settings": {
+                          "sourceCode": {
+                            "packageJson": "{}",
+                            "code": "export const code = async (params) => {\n  const raw = String(params.draft_followup ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = { email_subject: '', email_body: raw };\n  try { p = JSON.parse(raw); } catch {}\n  return { emailSubject: String(p.email_subject ?? '').trim(), emailBody: String(p.email_body ?? '').trim() };\n};"
+                          },
+                          "input": {
+                            "draft_followup": "{{draft_followup.output}}"
+                          }
+                        },
+                        "nextAction": {
+                          "type": "CODE",
+                          "name": "run_summary",
+                          "displayName": "Run summary",
+                          "valid": true,
+                          "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                          "settings": {
+                            "sourceCode": {
+                              "packageJson": "{}",
+                              "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    runAt: new Date().toISOString(),\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
+                            },
+                            "input": {
+                              "outcome": "processed",
+                              "candidate": "{{pick_candidate.output.candidate}}",
+                              "fingerprint": "{{pick_candidate.output.fingerprint}}",
+                              "extraction": "{{parse_extraction.output}}",
+                              "draft": "{{parse_draft.output}}"
+                            }
+                          },
+                          "nextAction": null
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "valid": true,
+  "schemaVersion": "22"
+}

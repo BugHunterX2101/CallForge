@@ -30,6 +30,15 @@ import { dirname } from 'path'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
+// Staged integration probe: WITH_GMAIL=1 adds exactly one piece step (Gmail
+// transcript search) to the all-code pipeline and writes flows-v2.json /
+// agent-v2.json. That isolates "does the runner execute piece steps?" from
+// every other variable (no placeholders, no routers, no extra pieces). The
+// Gmail step carries continueOnFailure so a failing search can't take the
+// run down; pick_candidate already falls back to the demo transcript when
+// the search fails or returns nothing.
+const WITH_GMAIL = process.env.WITH_GMAIL === '1'
+
 const TS = '2026-08-14T00:00:00.000Z'
 const SCHEMA_VERSION = '22'
 const FLOW_DISPLAY_NAME = 'Sales Call Logger & Follow-up Drafter'
@@ -89,6 +98,30 @@ function pieceTrigger({ name, displayName, piece, triggerName, input }) {
   }
 }
 
+// A PIECE action step in the same bare shape, with continueOnFailure so a
+// missing/unsupported connection degrades instead of aborting the run.
+function pieceAction({ name, displayName, piece, actionName, input }) {
+  return {
+    type: 'PIECE',
+    name,
+    displayName,
+    valid: true,
+    lastUpdatedDate: TS,
+    settings: {
+      pieceName: `@activepieces/piece-${piece}`,
+      pieceVersion: { gmail: '0.12.10', 'google-drive': '0.8.3', 'google-sheets': '0.16.7', slack: '0.17.8', ai: '0.6.0' }[piece] ?? '0.1.21',
+      actionName,
+      propertySettings: {},
+      input,
+      errorHandlingOptions: {
+        retryOnFailure: { value: false },
+        continueOnFailure: { value: true },
+      },
+    },
+    nextAction: null,
+  }
+}
+
 function chain(steps) {
   for (let i = 0; i < steps.length - 1; i++) {
     let t = steps[i]
@@ -128,24 +161,47 @@ Nina: If pricing works, we can pilot with sales ops by the end of next month.
 Ava: I'll send over the proposal this week and set up a security review.
 Nina: Sounds good. Send it directly to me.`
 
-// Deterministic candidate: the demo transcript is the source this run sweeps.
-// Fingerprint = date|from|body hash, so re-runs are stable (dedup key).
+// Deterministic candidate picking. With the Gmail probe step enabled, real
+// transcript emails from the sweep become candidates (newest first); when the
+// search step is absent/failed/empty the demo transcript is used instead, so
+// the run ALWAYS produces full output. Fingerprint = date|from|body hash, so
+// re-runs are stable (dedup key).
 const CODE_PICK_CANDIDATE = `export const code = async (params) => {
   function hash(str) {
     let h = 5381;
     for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
     return (h >>> 0).toString(16);
   }
-  const now = String(params.nowIso ?? new Date().toISOString());
-  const candidate = {
-    source: 'demo',
-    id: 'demo-transcript-acme',
-    subject: 'Transcript: Acme Corp discovery call — pricing & rollout',
-    from: 'nina.k@acmecorp.com',
-    date: now,
-    body: ${JSON.stringify(DEMO_TRANSCRIPT_BODY)},
-    link: 'https://mail.google.com/mail/u/0/#inbox/demo-transcript-acme',
-  };
+  const results = params.search_gmail;
+  const messages = results && Array.isArray(results.messages) ? results.messages : [];
+  const emails = messages
+    .map((m) => ({
+      source: 'gmail',
+      id: String(m?.id ?? ''),
+      subject: String(m?.subject ?? ''),
+      from: String(m?.from?.text ?? ''),
+      date: String(m?.date ?? ''),
+      body: String(m?.text ?? '').replace(/\\s+/g, ' ').trim(),
+      link: m?.id ? \`https://mail.google.com/mail/u/0/#inbox/\${m.id}\` : '',
+    }))
+    .filter((c) => c.date && c.body.length > 0);
+  let candidate = null;
+  if (emails.length > 0) {
+    emails.sort((a, b) => new Date(b.date) - new Date(a.date));
+    candidate = emails[0];
+  }
+  if (!candidate) {
+    const now = String(params.nowIso ?? new Date().toISOString());
+    candidate = {
+      source: 'demo',
+      id: 'demo-transcript-acme',
+      subject: 'Transcript: Acme Corp discovery call — pricing & rollout',
+      from: 'nina.k@acmecorp.com',
+      date: now,
+      body: ${JSON.stringify(DEMO_TRANSCRIPT_BODY)},
+      link: 'https://mail.google.com/mail/u/0/#inbox/demo-transcript-acme',
+    };
+  }
   return {
     candidate,
     fingerprint: hash(candidate.date + '|' + candidate.from + '|' + candidate.body.slice(0, 2000)),
@@ -323,11 +379,34 @@ function buildFlow() {
     code: CODE_SWEEP_WINDOW,
   })
 
+  // Staged integration probe: one Gmail piece step. gmail_search_email returns
+  // { found, results: { count, messages } } — bind the inner results so
+  // pick_candidate can read messages, and fall back to the demo transcript
+  // when the step fails (continueOnFailure) or finds nothing.
+  const searchGmail = WITH_GMAIL
+    ? pieceAction({
+        name: 'search_gmail',
+        displayName: 'Search transcript emails',
+        piece: 'gmail',
+        actionName: 'gmail_search_email',
+        input: {
+          auth: "{{connections['gmail']}}",
+          from: '',
+          after_date: '{{sweep_window.output.sinceIso}}',
+          max_results: 10,
+          include_spam_trash: false,
+        },
+      })
+    : null
+
   const pickCandidate = codeAction({
     name: 'pick_candidate',
     displayName: 'Pick newest transcript',
     code: CODE_PICK_CANDIDATE,
-    input: { nowIso: '{{sweep_window.output.nowIso}}' },
+    input: {
+      nowIso: '{{sweep_window.output.nowIso}}',
+      ...(WITH_GMAIL ? { search_gmail: '{{search_gmail.output.results}}' } : {}),
+    },
   })
 
   const checkDedup = codeAction({
@@ -397,9 +476,12 @@ function buildFlow() {
     },
   })
 
+  const head = [sweepWindow]
+  if (searchGmail) head.push(searchGmail)
+  head.push(pickCandidate)
+
   trigger.nextAction = chain([
-    sweepWindow,
-    pickCandidate,
+    ...head,
     checkDedup,
     readabilityCheck,
     extractFacts,
@@ -440,9 +522,15 @@ const template = {
   status: 'PUBLISHED',
 }
 
-writeFileSync(join(ROOT, 'agent.json'), JSON.stringify(flow, null, 2) + '\n', 'utf8')
-writeFileSync(join(ROOT, 'flows.json'), JSON.stringify(template, null, 2) + '\n', 'utf8')
-
-console.log('Wrote agent.json + flows.json (linear all-code flow, bare shape)')
-console.log('Flow: ' + flow.displayName + ' (schemaVersion ' + SCHEMA_VERSION + ')')
-console.log('Steps incl. trigger: 11 — all CODE, no pieces/routers/loops/connections')
+if (WITH_GMAIL) {
+  writeFileSync(join(ROOT, 'agent-v2.json'), JSON.stringify(flow, null, 2) + '\n', 'utf8')
+  writeFileSync(join(ROOT, 'flows-v2.json'), JSON.stringify(template, null, 2) + '\n', 'utf8')
+  console.log('Wrote agent-v2.json + flows-v2.json (all-code + ONE Gmail piece step)')
+  console.log('Steps incl. trigger: 12 — 10 CODE + 1 Gmail PIECE (continueOnFailure) + trigger')
+} else {
+  writeFileSync(join(ROOT, 'agent.json'), JSON.stringify(flow, null, 2) + '\n', 'utf8')
+  writeFileSync(join(ROOT, 'flows.json'), JSON.stringify(template, null, 2) + '\n', 'utf8')
+  console.log('Wrote agent.json + flows.json (linear all-code flow, bare shape)')
+  console.log('Flow: ' + flow.displayName + ' (schemaVersion ' + SCHEMA_VERSION + ')')
+  console.log('Steps incl. trigger: 11 — all CODE, no pieces/routers/loops/connections')
+}
