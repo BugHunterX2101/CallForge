@@ -7,17 +7,19 @@ platform's upload box actually wants.
 
 | File | What it is |
 |---|---|
-| [`flows-v4.json`](../flows-v4.json) | **THE RUBRIC-COMPLETE SUBMISSION (recommended).** v3 + Drive folder source (`google-drive@0.7.10 list-files`/`read-file`), agent-created tabs (`find-or-create-worksheet` for all 5 Deal Tracker tabs), AI deal-priority classification (`classifyText`), Contacts + Tasks writes, and the **Slack Approve/Reject approval gate** on the follow-up (`slack@0.17.4 request_approval_message` — the run pauses until a human clicks). Upload this. |
+| [`flows-v5.json`](../flows-v5.json) | **THE CURRENT SUBMISSION (recommended).** Everything in v4 **plus the HubSpot CRM sync** (`@activepieces/piece-hubspot@0.8.9`): contact upsert keyed on email (`create-or-update-contact`), deal opened on the default pipeline (`create-deal`), contact↔deal link (`create-associations`) — the acceptance criteria that are CRM-shaped ("deal updated, call logged against the deal"). Upload this. |
+| [`agent-v5.json`](../agent-v5.json) | The v5 flow as a single `FLOW_VERSION` export. |
+| [`flows-v4.json`](../flows-v4.json) | The rubric-complete v4 — Drive folder source (`google-drive@0.7.10 list-files`/`read-file`), agent-created tabs (`find-or-create-worksheet` for all 5 Deal Tracker tabs), AI deal-priority classification (`classifyText`), Contacts + Tasks writes, and the **Slack Approve/Reject approval gate** on the follow-up (`slack@0.17.4 request_approval_message` — the run pauses until a human clicks). Ran successfully on the platform. |
 | [`agent-v4.json`](../agent-v4.json) | The v4 flow as a single `FLOW_VERSION` export. |
-| [`flows-v3.json`](../flows-v3.json) | The proven v3 integration — Gmail search, Sheets dedup + Deal Tracker writes, Slack recap, AI extraction. Ran successfully on the platform. |
+| [`flows-v3.json`](../flows-v3.json) | The proven v3 integration — Gmail search, Sheets dedup + Deal Tracker writes, Slack recap, AI extraction. |
 | [`agent-v3.json`](../agent-v3.json) | The v3 flow as a single `FLOW_VERSION` export. |
 | [`flows.json`](../flows.json) | The fallback submission — the linear, all-code flow (no pieces) that is guaranteed to run. |
 | [`agent.json`](../agent.json) | The all-code flow as a raw export. |
 | [`flows-full.json`](../flows-full.json) | The old full integration build (routers/loops/Drive, newer piece versions) — kept for reference. |
-| [`build-agent-platform.mjs`](./build-agent-platform.mjs) | Generator for **both** v3 and v4 (`flows-v3/4.json` + `agent-v3/4.json`). |
+| [`build-agent-platform.mjs`](./build-agent-platform.mjs) | Generator for **v3, v4 and v5** (`flows-v3/4/5.json` + `agent-v3/4/5.json`; v5 = `buildFlowV4({ hubspot: true })`). |
 | [`build-agent-codeonly.mjs`](./build-agent-codeonly.mjs) | Generator for the all-code fallback (`flows.json`/`agent.json`; `WITH_GMAIL=1` also emits the v2 probe). |
 | [`build-agent.mjs`](./build-agent.mjs) | Generator for the reference full build (`flows-full.json`/`agent-full.json`). |
-| [`test-platform.mjs`](./test-platform.mjs) | End-to-end test for v3 and v4: executes each flow's code steps through real bindings with mocked piece outputs (sandbox scenario) and asserts complete output. |
+| [`test-platform.mjs`](./test-platform.mjs) | End-to-end test for v3, v4 and v5: executes each flow's code steps through real bindings with mocked piece outputs (sandbox scenario) and asserts complete output. |
 | [`test-codeonly.mjs`](./test-codeonly.mjs) | End-to-end test for the all-code fallback. |
 | [`test-agent.mjs`](./test-agent.mjs) | Behavior test harness for the reference build (reads `agent-full.json`). |
 
@@ -112,7 +114,7 @@ Every placeholder is a `REPLACE_WITH_…` string so it's easy to find:
 |---|---|
 | `REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID` | The Google Sheet ID of your Deal Tracker (from its URL, the `1xxx…` part). Appears on every Sheets step. |
 | `REPLACE_WITH_TRANSCRIPT_FOLDER_ID` | The Drive folder ID your meeting tool exports transcripts to (`list_drive` step). |
-| `REPLACE_WITH_SLACK_CHANNEL_ID` | The Slack channel ID (`C…`) where recaps/approvals land. In v4 it appears on 2 nodes (the recap and the approval request). |
+| `REPLACE_WITH_SLACK_CHANNEL_ID` | The Slack channel ID (`C…`) where recaps/approvals land. In v4/v5 it appears on 2 nodes (the recap and the approval request). |
 
 The model on the AI steps (`extract_facts` and the three `draft_followup_*` steps) is `openai/gpt-4o-mini`; change it to a model your platform's AI provider offers.
 
@@ -197,9 +199,9 @@ Rows are written with `first_row_headers: true` (values keyed by column
 letter: `A` = first column). You can add an example row per tab if you like —
 the flow does not require one.
 
-> If a CRM (e.g. HubSpot) is your system of record instead of the sheet, the
-> sheet steps in each pipeline can be swapped for HubSpot actions — see
-> "Known simplifications".
+> If a CRM (e.g. HubSpot) is your system of record, v5 already syncs it —
+> the HubSpot contact upsert, deal and contact↔deal association run alongside
+> the sheet writes (`@activepieces/piece-hubspot@0.8.9`).
 
 ## 3. What the flow does
 
@@ -278,10 +280,13 @@ accounts to wire correctly:
   **Download Files** on that step and map the downloaded content onto the
   candidate in `pick_candidate` (the code already reads
   `params.search_gmail`; add a `drive` candidate with a `body`).
-- **CRM writes.** The flow writes to the Deal Tracker sheet. To use a real CRM
-  instead, swap the Deals/Call Notes/Tasks sheet writes for HubSpot actions —
-  the piece supports `create-contact`, `find-contact`, `create-deal`,
-  `find-deal`, `update-deal` (`@activepieces/piece-hubspot`, version 0.8.9).
+- **CRM writes — already in v5.** `flows-v5.json` syncs HubSpot alongside the
+  sheet: `create-or-update-contact` (idempotent on email), `create-deal`
+  (default pipeline, `qualifiedtobuy` stage, description + `hs_next_step`),
+  and `create-associations` linking contact↔deal (`@activepieces/piece-hubspot`
+  version 0.8.9, the exact version the platform's catalog ships). Deeper CRM
+  behavior (owner assignment, pipeline/stage per account, native task objects)
+  is still future work — the piece has no `create-task` action in 0.8.9.
 - **Persistent last-checked timestamps.** v1 uses a rolling 15-minute window;
   the PRD's "no gaps" guarantee is fully met by tracking a last-checked
   timestamp in the sheet. Add a `_State` tab + read/write steps if you need

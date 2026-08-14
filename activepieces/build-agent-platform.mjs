@@ -50,6 +50,15 @@ const PIECES = {
   ai: '0.6.0',
 }
 
+// v5 adds HubSpot (verified in the platform apps catalog as OAUTH2, and its
+// action registry audited from the exact 0.8.9 bundle: create-or-update-contact,
+// create-deal, create-associations). Kept separate so v4 artifacts stay
+// byte-identical to what already ran on the platform.
+const HUBSPOT_VERSION = '0.8.9'
+
+// Full version map used when building steps (hubspot is only wired into v5).
+const PIECE_VERSIONS = { ...PIECES, hubspot: HUBSPOT_VERSION }
+
 // Placeholders replaced via the platform's ask-user questions.
 const SPREADSHEET_ID = 'REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID'
 const DRIVE_FOLDER_ID = 'REPLACE_WITH_TRANSCRIPT_FOLDER_ID'
@@ -64,6 +73,7 @@ const GMAIL_AUTH = { auth: "{{connections['gmail']}}" }
 const DRIVE_AUTH = { auth: "{{connections['googleDrive']}}" }
 const SHEET_AUTH = { auth: "{{connections['googleSheets']}}" }
 const SLACK_AUTH = { auth: "{{connections['slack']}}" }
+const HUBSPOT_AUTH = { auth: "{{connections['hubspot']}}" }
 
 // Column headers seeded by find-or-create-worksheet when a tab is missing
 // (guideline #3: the agent creates what it needs).
@@ -100,7 +110,7 @@ function pieceAction({ name, displayName, piece, actionName, input }) {
     lastUpdatedDate: TS,
     settings: {
       pieceName: `@activepieces/piece-${piece}`,
-      pieceVersion: PIECES[piece],
+      pieceVersion: PIECE_VERSIONS[piece],
       actionName,
       propertySettings: {},
       input,
@@ -122,7 +132,7 @@ function pieceTrigger({ name, displayName, piece, triggerName, input }) {
     lastUpdatedDate: TS,
     settings: {
       pieceName: `@activepieces/piece-${piece}`,
-      pieceVersion: PIECES[piece],
+      pieceVersion: PIECE_VERSIONS[piece],
       triggerName,
       propertySettings: {},
       input,
@@ -581,6 +591,57 @@ const CODE_LOG_VALUES_V4 = `export const code = async (params) => {
   };
 };`
 
+// ---- v5 code steps ---------------------------------------------------------
+
+// Derives the HubSpot contact/deal payloads from the extraction, so the piece
+// inputs stay clean and a missing attendee email degrades gracefully.
+const CODE_HUBSPOT_VALUES = `export const code = async (params) => {
+  const ex = params.extraction ?? {};
+  const cand = params.candidate ?? {};
+  const email = String(ex.externalAttendee ?? '').trim();
+  const local = email.split('@')[0] ?? '';
+  const parts = local.split(/[._+-]/).filter((p) => p.length > 0);
+  const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : '');
+  const firstname = parts.length > 0 ? cap(parts[0]) : '';
+  const lastname = parts.length > 1 ? cap(parts[parts.length - 1]) : '';
+  const company = String(ex.suggestedAccount ?? '').trim();
+  const subject = String(cand.subject ?? 'Sales call').trim();
+  const firstTask = Array.isArray(ex.tasks) && ex.tasks.length > 0 ? String(ex.tasks[0].task ?? '') : '';
+  return {
+    email,
+    firstname,
+    lastname,
+    company,
+    dealName: (company ? company + ' — ' : '') + subject,
+    description: String(ex.summary ?? '').slice(0, 2000),
+    nextStep: firstTask.slice(0, 500),
+    hasEmail: email.length > 0,
+  };
+};`
+
+// v5 run summary: v4 shape + a hubspot section reporting the CRM writes.
+// Inputs are flat top-level bindings (same pattern as approval/deals/etc.) so
+// they resolve on both the runner and the test harness.
+const CODE_RUN_SUMMARY_V5 = CODE_RUN_SUMMARY_V4
+  .replace(
+    'const tabs = {};',
+    `const hs = {
+    contactId: params.hubspot_contact_id ?? null,
+    dealId: params.hubspot_deal_id ?? null,
+    associated: params.hubspot_associations ?? 0,
+    attempted: !!params.hubspot_attempted,
+  };
+  const tabs = {};`
+  )
+  .replace(
+    `  if (params.contentUnavailable) warnings.push('Drive transcript content not readable on this runner — processed via fallback transcript');`,
+    `  if (params.contentUnavailable) warnings.push('Drive transcript content not readable on this runner — processed via fallback transcript');\n  if (!params.hubspotHasEmail) warnings.push('no external attendee email — HubSpot contact not upserted');`
+  )
+  .replace(
+    '    warnings,\n  };',
+    '    hubspot: {\n      contactId: hs.contactId ?? null,\n      dealId: hs.dealId ?? null,\n      associated: Number(hs.associated ?? 0) >= 1,\n      attempted: !!hs.attempted,\n    },\n    warnings,\n  };'
+  )
+
 // ---------------------------------------------------------------------------
 // AI prompts (guardrails, PRD §10)
 // ---------------------------------------------------------------------------
@@ -941,7 +1002,7 @@ function buildFlowV3() {
 // complete run_summary.
 // ---------------------------------------------------------------------------
 
-function buildFlowV4() {
+function buildFlowV4(opts = {}) {
   const trigger = pieceTrigger({
     name: 'trigger',
     displayName: 'Sweep every 5 minutes',
@@ -1021,8 +1082,12 @@ function buildFlowV4() {
   // then used by every write below, so tab order never matters.
   const ensure = {}
   for (const [key, title] of [['deals', 'Deals'], ['contacts', 'Contacts'], ['callNotes', 'Call Notes'], ['tasks', 'Tasks'], ['processed', '_ProcessedCalls']]) {
+    // Step names are snake_case so every {{ensure_*}} binding matches (the
+    // camelCase 'ensure_callNotes' step never resolved its bindings on the
+    // runner — the Call Notes write silently failed via continueOnFailure).
+    const stepKey = key.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase())
     ensure[key] = pieceAction({
-      name: 'ensure_' + key,
+      name: 'ensure_' + stepKey,
       displayName: 'Ensure tab: ' + title,
       piece: 'google-sheets',
       actionName: 'find-or-create-worksheet',
@@ -1112,6 +1177,75 @@ function buildFlowV4() {
       candidate: '{{finalize_candidate.output.candidate}}',
     },
   })
+
+  // v5: HubSpot CRM sync — upsert the contact by email, open the deal on the
+  // default pipeline (guard against duplicates via the sheet dedup upstream;
+  // the contact upsert is idempotent on email), then link contact<->deal.
+  // Every step keeps continueOnFailure: a missing email or a stage/pipeline
+  // mismatch logs and the run still completes.
+  let hubspotSteps = []
+  if (opts.hubspot) {
+    const hubspotValues = codeAction({
+      name: 'hubspot_values',
+      displayName: 'Build HubSpot values',
+      code: CODE_HUBSPOT_VALUES,
+      input: {
+        extraction: '{{parse_extraction.output}}',
+        candidate: '{{finalize_candidate.output.candidate}}',
+      },
+    })
+
+    const hubspotContact = pieceAction({
+      name: 'hubspot_contact',
+      displayName: 'Upsert contact (HubSpot)',
+      piece: 'hubspot',
+      actionName: 'create-or-update-contact',
+      input: {
+        ...HUBSPOT_AUTH,
+        email: '{{hubspot_values.output.email}}',
+        objectProperties: {
+          firstname: '{{hubspot_values.output.firstname}}',
+          lastname: '{{hubspot_values.output.lastname}}',
+          company: '{{hubspot_values.output.company}}',
+        },
+      },
+    })
+
+    const hubspotDeal = pieceAction({
+      name: 'hubspot_deal',
+      displayName: 'Create deal (HubSpot)',
+      piece: 'hubspot',
+      actionName: 'create-deal',
+      input: {
+        ...HUBSPOT_AUTH,
+        dealname: '{{hubspot_values.output.dealName}}',
+        pipelineId: 'default',
+        pipelineStageId: 'qualifiedtobuy',
+        objectProperties: {
+          description: '{{hubspot_values.output.description}}',
+          hs_next_step: '{{hubspot_values.output.nextStep}}',
+          dealtype: 'newbusiness',
+        },
+      },
+    })
+
+    const hubspotAssociate = pieceAction({
+      name: 'hubspot_associate',
+      displayName: 'Link contact to deal (HubSpot)',
+      piece: 'hubspot',
+      actionName: 'create-associations',
+      input: {
+        ...HUBSPOT_AUTH,
+        fromObjectId: '{{hubspot_contact.output.id}}',
+        fromObjectType: 'contact',
+        toObjectType: 'deal',
+        associationType: 4,
+        toObjectIds: ['{{hubspot_deal.output.id}}'],
+      },
+    })
+
+    hubspotSteps = [hubspotValues, hubspotContact, hubspotDeal, hubspotAssociate]
+  }
 
   const newDealId = codeAction({ name: 'new_deal_id', displayName: 'New deal id', code: CODE_NEW_DEAL_ID })
 
@@ -1327,7 +1461,7 @@ function buildFlowV4() {
   const runSummary = codeAction({
     name: 'run_summary',
     displayName: 'Run summary',
-    code: CODE_RUN_SUMMARY_V4,
+    code: opts.hubspot ? CODE_RUN_SUMMARY_V5 : CODE_RUN_SUMMARY_V4,
     input: {
       outcome: 'processed',
       dealRef: '{{log_values.output.dealRef}}',
@@ -1345,6 +1479,15 @@ function buildFlowV4() {
       callNotes: '{{ensure_call_notes.output}}',
       tasks: '{{ensure_tasks.output}}',
       processed: '{{ensure_processed.output}}',
+      ...(opts.hubspot
+        ? {
+            hubspot_contact_id: '{{hubspot_contact.output.id}}',
+            hubspot_deal_id: '{{hubspot_deal.output.id}}',
+            hubspot_associations: '{{hubspot_associate.output.totalAssociations}}',
+            hubspot_attempted: true,
+            hubspotHasEmail: '{{hubspot_values.output.hasEmail}}',
+          }
+        : {}),
     },
   })
 
@@ -1367,6 +1510,7 @@ function buildFlowV4() {
     parsePriority,
     extractFacts,
     parseExtraction,
+    ...hubspotSteps,
     newDealId,
     logValues,
     createDealSheet,
@@ -1385,7 +1529,9 @@ function buildFlowV4() {
   return {
     type: 'FLOW_VERSION',
     displayName: FLOW_DISPLAY_NAME,
-    description: 'Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail and Drive transcript sources, fingerprint dedup against a _ProcessedCalls ledger, AI extraction and deal-priority classification with guardrails, Deal Tracker writes (Deals, Contacts, Call Notes, _ProcessedCalls), a Gmail draft, and a Slack recap with one-tap Approve/Reject approval gate on the follow-up.',
+    description: opts.hubspot
+      ? 'Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail and Drive transcript sources, fingerprint dedup against a _ProcessedCalls ledger, AI extraction and deal-priority classification with guardrails, Deal Tracker writes (Deals, Contacts, Call Notes, _ProcessedCalls), HubSpot CRM sync (contact upsert, deal, association), a Gmail draft, and a Slack recap with one-tap Approve/Reject approval gate on the follow-up.'
+      : 'Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail and Drive transcript sources, fingerprint dedup against a _ProcessedCalls ledger, AI extraction and deal-priority classification with guardrails, Deal Tracker writes (Deals, Contacts, Call Notes, _ProcessedCalls), a Gmail draft, and a Slack recap with one-tap Approve/Reject approval gate on the follow-up.',
     trigger,
     valid: true,
     schemaVersion: SCHEMA_VERSION,
@@ -1415,21 +1561,26 @@ function templateFor(flow, pieceKeys, summary = flow.description) {
 
 const flowV3 = buildFlowV3()
 const flowV4 = buildFlowV4()
+const flowV5 = buildFlowV4({ hubspot: true })
 
 const PIECES_V3 = ['schedule', 'gmail', 'google-sheets', 'slack', 'ai']
 const PIECES_V4 = Object.keys(PIECES)
+const PIECES_V5 = [...PIECES_V4, 'hubspot']
 const V3_SUMMARY = 'Scheduled sweep of Gmail transcript sources, fingerprint dedup, AI extraction with guardrails, and a Slack recap that gates the follow-up email.'
 
 writeFileSync(join(ROOT, 'agent-v3.json'), JSON.stringify(flowV3, null, 2) + '\n', 'utf8')
 writeFileSync(join(ROOT, 'flows-v3.json'), JSON.stringify(templateFor(flowV3, PIECES_V3, V3_SUMMARY), null, 2) + '\n', 'utf8')
 writeFileSync(join(ROOT, 'agent-v4.json'), JSON.stringify(flowV4, null, 2) + '\n', 'utf8')
 writeFileSync(join(ROOT, 'flows-v4.json'), JSON.stringify(templateFor(flowV4, PIECES_V4), null, 2) + '\n', 'utf8')
+writeFileSync(join(ROOT, 'agent-v5.json'), JSON.stringify(flowV5, null, 2) + '\n', 'utf8')
+writeFileSync(join(ROOT, 'flows-v5.json'), JSON.stringify(templateFor(flowV5, PIECES_V5), null, 2) + '\n', 'utf8')
 
 console.log('Wrote agent-v3.json + flows-v3.json (v3, proven platform build)')
 console.log('Wrote agent-v4.json + flows-v4.json (v4, rubric-complete submission)')
-console.log('Flow: ' + flowV4.displayName + ' (schemaVersion ' + SCHEMA_VERSION + ')')
-console.log('v4 steps incl. trigger: 32 — CODE + PIECE steps with platform-exact names')
-console.log('Pieces:', Object.entries(PIECES).map(([k, v]) => k + '@' + v).join(', '))
+console.log('Wrote agent-v5.json + flows-v5.json (v5, + HubSpot CRM sync)')
+console.log('Flow: ' + flowV5.displayName + ' (schemaVersion ' + SCHEMA_VERSION + ')')
+console.log('v5 steps incl. trigger: 36 — CODE + PIECE steps with platform-exact names')
+console.log('Pieces:', Object.entries(PIECE_VERSIONS).map(([k, v]) => k + '@' + v).join(', '))
 console.log('Placeholders (ask-user):')
 console.log('  - Deal Tracker spreadsheet id: ' + SPREADSHEET_ID)
 console.log('  - Drive transcript folder id:  ' + DRIVE_FOLDER_ID)

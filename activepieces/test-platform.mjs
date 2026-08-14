@@ -60,6 +60,13 @@ const MOCK_PIECE_V4 = {
   log_processed: { row: 4 },
 }
 
+const MOCK_PIECE_V5 = {
+  ...MOCK_PIECE_V4,
+  hubspot_contact: { id: '1001', properties: { email: 'nina.k@acmecorp.com' } },
+  hubspot_deal: { id: '2001', properties: { dealname: 'Acme Corp — transcript' } },
+  hubspot_associate: { totalAssociations: 1, batchCount: 1 },
+}
+
 function resolve(value, outputs) {
   if (typeof value !== 'string') return value
   const bindings = [...value.matchAll(/\{\{([^}]+)\}\}/g)]
@@ -142,10 +149,23 @@ async function testFile(file, mocks, label) {
     ok('v4: sources reported', typeof summary.sources?.gmailFound === 'number' && typeof summary.sources?.driveFound === 'number')
     ok('v4: tabs report present', summary.tabs?.deals?.sheetId === 0 && summary.tabs?.processed?.sheetId === 4)
   }
+
+  if (label === 'v5') {
+    ok('v5: approval status present', ['approved', 'rejected', 'pending'].includes(summary.approval?.status))
+    ok('v5: priority present', ['high', 'medium', 'low'].includes(summary.priority))
+    ok('v5: sources reported', typeof summary.sources?.gmailFound === 'number' && typeof summary.sources?.driveFound === 'number')
+    ok('v5: tabs report present', summary.tabs?.deals?.sheetId === 0 && summary.tabs?.processed?.sheetId === 4)
+    ok('v5: hubspot attempted', summary.hubspot?.attempted === true)
+    ok('v5: hubspot contact id present', !!summary.hubspot?.contactId)
+    ok('v5: hubspot deal id present', !!summary.hubspot?.dealId)
+    ok('v5: hubspot associated', summary.hubspot?.associated === true)
+    ok('v5: no hubspot warning (email present)', !summary.warnings.some((w) => /hubspot/i.test(w)))
+  }
 }
 
 await testFile('agent-v3.json', MOCK_PIECE_V3, 'v3')
 await testFile('agent-v4.json', MOCK_PIECE_V4, 'v4')
+await testFile('agent-v5.json', MOCK_PIECE_V5, 'v5')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)

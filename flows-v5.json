@@ -1,8 +1,8 @@
 {
   "name": "Sales Call Logger & Follow-up Drafter",
   "type": "SHARED",
-  "summary": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail and Drive transcript sources, fingerprint dedup against a _ProcessedCalls ledger, AI extraction and deal-priority classification with guardrails, Deal Tracker writes (Deals, Contacts, Call Notes, _ProcessedCalls), a Gmail draft, and a Slack recap with one-tap Approve/Reject approval gate on the follow-up.",
-  "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail and Drive transcript sources, fingerprint dedup against a _ProcessedCalls ledger, AI extraction and deal-priority classification with guardrails, Deal Tracker writes (Deals, Contacts, Call Notes, _ProcessedCalls), a Gmail draft, and a Slack recap with one-tap Approve/Reject approval gate on the follow-up.",
+  "summary": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail and Drive transcript sources, fingerprint dedup against a _ProcessedCalls ledger, AI extraction and deal-priority classification with guardrails, Deal Tracker writes (Deals, Contacts, Call Notes, _ProcessedCalls), HubSpot CRM sync (contact upsert, deal, association), a Gmail draft, and a Slack recap with one-tap Approve/Reject approval gate on the follow-up.",
+  "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail and Drive transcript sources, fingerprint dedup against a _ProcessedCalls ledger, AI extraction and deal-priority classification with guardrails, Deal Tracker writes (Deals, Contacts, Call Notes, _ProcessedCalls), HubSpot CRM sync (contact upsert, deal, association), a Gmail draft, and a Slack recap with one-tap Approve/Reject approval gate on the follow-up.",
   "tags": [],
   "blogUrl": "",
   "metadata": {
@@ -16,13 +16,14 @@
     "@activepieces/piece-google-drive",
     "@activepieces/piece-google-sheets",
     "@activepieces/piece-slack",
-    "@activepieces/piece-ai"
+    "@activepieces/piece-ai",
+    "@activepieces/piece-hubspot"
   ],
   "flows": [
     {
       "type": "FLOW_VERSION",
       "displayName": "Sales Call Logger & Follow-up Drafter",
-      "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail and Drive transcript sources, fingerprint dedup against a _ProcessedCalls ledger, AI extraction and deal-priority classification with guardrails, Deal Tracker writes (Deals, Contacts, Call Notes, _ProcessedCalls), a Gmail draft, and a Slack recap with one-tap Approve/Reject approval gate on the follow-up.",
+      "description": "Sales Call Logger & Follow-up Drafter — scheduled sweep of Gmail and Drive transcript sources, fingerprint dedup against a _ProcessedCalls ledger, AI extraction and deal-priority classification with guardrails, Deal Tracker writes (Deals, Contacts, Call Notes, _ProcessedCalls), HubSpot CRM sync (contact upsert, deal, association), a Gmail draft, and a Slack recap with one-tap Approve/Reject approval gate on the follow-up.",
       "trigger": {
         "type": "PIECE_TRIGGER",
         "name": "trigger",
@@ -488,63 +489,70 @@
                                             },
                                             "nextAction": {
                                               "type": "CODE",
-                                              "name": "new_deal_id",
-                                              "displayName": "New deal id",
+                                              "name": "hubspot_values",
+                                              "displayName": "Build HubSpot values",
                                               "valid": true,
                                               "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                               "settings": {
                                                 "sourceCode": {
                                                   "packageJson": "{}",
-                                                  "code": "export const code = async () => {\n  return { dealId: 'deal_' + Date.now().toString(36), createdAt: new Date().toISOString() };\n};"
+                                                  "code": "export const code = async (params) => {\n  const ex = params.extraction ?? {};\n  const cand = params.candidate ?? {};\n  const email = String(ex.externalAttendee ?? '').trim();\n  const local = email.split('@')[0] ?? '';\n  const parts = local.split(/[._+-]/).filter((p) => p.length > 0);\n  const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : '');\n  const firstname = parts.length > 0 ? cap(parts[0]) : '';\n  const lastname = parts.length > 1 ? cap(parts[parts.length - 1]) : '';\n  const company = String(ex.suggestedAccount ?? '').trim();\n  const subject = String(cand.subject ?? 'Sales call').trim();\n  const firstTask = Array.isArray(ex.tasks) && ex.tasks.length > 0 ? String(ex.tasks[0].task ?? '') : '';\n  return {\n    email,\n    firstname,\n    lastname,\n    company,\n    dealName: (company ? company + ' — ' : '') + subject,\n    description: String(ex.summary ?? '').slice(0, 2000),\n    nextStep: firstTask.slice(0, 500),\n    hasEmail: email.length > 0,\n  };\n};"
                                                 },
-                                                "input": {}
+                                                "input": {
+                                                  "extraction": "{{parse_extraction.output}}",
+                                                  "candidate": "{{finalize_candidate.output.candidate}}"
+                                                }
                                               },
                                               "nextAction": {
-                                                "type": "CODE",
-                                                "name": "log_values",
-                                                "displayName": "Build row values",
+                                                "type": "PIECE",
+                                                "name": "hubspot_contact",
+                                                "displayName": "Upsert contact (HubSpot)",
                                                 "valid": true,
                                                 "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                 "settings": {
-                                                  "sourceCode": {
-                                                    "packageJson": "{}",
-                                                    "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  return {\n    noteId: 'note_' + Date.now().toString(36),\n    dealRef: String(params.dealRef ?? ''),\n    nowIso: new Date().toISOString(),\n    attendee: String(ex.externalAttendee ?? ''),\n    date: String(cand.date ?? ''),\n    summary: String(ex.summary ?? ''),\n    objections: JSON.stringify(Array.isArray(ex.objections) ? ex.objections : []),\n    commitments: JSON.stringify(Array.isArray(ex.commitments) ? ex.commitments : []),\n    tasks: JSON.stringify(Array.isArray(ex.tasks) ? ex.tasks : []),\n    priority: String(params.priority ?? 'medium'),\n    source: String(cand.source ?? ''),\n    link: String(cand.link ?? ''),\n    suggestedAccount: String(ex.suggestedAccount ?? ''),\n  };\n};"
-                                                  },
+                                                  "pieceName": "@activepieces/piece-hubspot",
+                                                  "pieceVersion": "0.8.9",
+                                                  "actionName": "create-or-update-contact",
+                                                  "propertySettings": {},
                                                   "input": {
-                                                    "dealRef": "{{new_deal_id.output.dealId}}",
-                                                    "candidate": "{{finalize_candidate.output.candidate}}",
-                                                    "extraction": "{{parse_extraction.output}}",
-                                                    "priority": "{{parse_priority.output.priority}}"
+                                                    "auth": "{{connections['hubspot']}}",
+                                                    "email": "{{hubspot_values.output.email}}",
+                                                    "objectProperties": {
+                                                      "firstname": "{{hubspot_values.output.firstname}}",
+                                                      "lastname": "{{hubspot_values.output.lastname}}",
+                                                      "company": "{{hubspot_values.output.company}}"
+                                                    }
+                                                  },
+                                                  "errorHandlingOptions": {
+                                                    "retryOnFailure": {
+                                                      "value": false
+                                                    },
+                                                    "continueOnFailure": {
+                                                      "value": true
+                                                    }
                                                   }
                                                 },
                                                 "nextAction": {
                                                   "type": "PIECE",
-                                                  "name": "create_deal_sheet",
-                                                  "displayName": "Create deal row",
+                                                  "name": "hubspot_deal",
+                                                  "displayName": "Create deal (HubSpot)",
                                                   "valid": true,
                                                   "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                   "settings": {
-                                                    "pieceName": "@activepieces/piece-google-sheets",
-                                                    "pieceVersion": "0.16.4",
-                                                    "actionName": "insert_row",
+                                                    "pieceName": "@activepieces/piece-hubspot",
+                                                    "pieceVersion": "0.8.9",
+                                                    "actionName": "create-deal",
                                                     "propertySettings": {},
                                                     "input": {
-                                                      "auth": "{{connections['googleSheets']}}",
-                                                      "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
-                                                      "sheetId": "{{ensure_deals.output.worksheet.sheetId}}",
-                                                      "first_row_headers": true,
-                                                      "as_string": false,
-                                                      "values": [
-                                                        "{{log_values.output.dealRef}}",
-                                                        "{{log_values.output.suggestedAccount}}",
-                                                        "{{log_values.output.suggestedAccount}}",
-                                                        "{{log_values.output.attendee}}",
-                                                        "Discovery",
-                                                        "{{log_values.output.date}}",
-                                                        "{{log_values.output.nowIso}}",
-                                                        "{{log_values.output.priority}}",
-                                                        "Open"
-                                                      ]
+                                                      "auth": "{{connections['hubspot']}}",
+                                                      "dealname": "{{hubspot_values.output.dealName}}",
+                                                      "pipelineId": "default",
+                                                      "pipelineStageId": "qualifiedtobuy",
+                                                      "objectProperties": {
+                                                        "description": "{{hubspot_values.output.description}}",
+                                                        "hs_next_step": "{{hubspot_values.output.nextStep}}",
+                                                        "dealtype": "newbusiness"
+                                                      }
                                                     },
                                                     "errorHandlingOptions": {
                                                       "retryOnFailure": {
@@ -557,27 +565,23 @@
                                                   },
                                                   "nextAction": {
                                                     "type": "PIECE",
-                                                    "name": "log_contact",
-                                                    "displayName": "Log contact",
+                                                    "name": "hubspot_associate",
+                                                    "displayName": "Link contact to deal (HubSpot)",
                                                     "valid": true,
                                                     "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                     "settings": {
-                                                      "pieceName": "@activepieces/piece-google-sheets",
-                                                      "pieceVersion": "0.16.4",
-                                                      "actionName": "insert_row",
+                                                      "pieceName": "@activepieces/piece-hubspot",
+                                                      "pieceVersion": "0.8.9",
+                                                      "actionName": "create-associations",
                                                       "propertySettings": {},
                                                       "input": {
-                                                        "auth": "{{connections['googleSheets']}}",
-                                                        "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
-                                                        "sheetId": "{{ensure_contacts.output.worksheet.sheetId}}",
-                                                        "first_row_headers": true,
-                                                        "as_string": false,
-                                                        "values": [
-                                                          "{{log_values.output.attendee}}",
-                                                          "{{log_values.output.suggestedAccount}}",
-                                                          "{{log_values.output.date}}",
-                                                          "{{log_values.output.source}}",
-                                                          "{{log_values.output.link}}"
+                                                        "auth": "{{connections['hubspot']}}",
+                                                        "fromObjectId": "{{hubspot_contact.output.id}}",
+                                                        "fromObjectType": "contact",
+                                                        "toObjectType": "deal",
+                                                        "associationType": 4,
+                                                        "toObjectIds": [
+                                                          "{{hubspot_deal.output.id}}"
                                                         ]
                                                       },
                                                       "errorHandlingOptions": {
@@ -590,108 +594,98 @@
                                                       }
                                                     },
                                                     "nextAction": {
-                                                      "type": "PIECE",
-                                                      "name": "log_call_notes",
-                                                      "displayName": "Log call notes",
+                                                      "type": "CODE",
+                                                      "name": "new_deal_id",
+                                                      "displayName": "New deal id",
                                                       "valid": true,
                                                       "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                       "settings": {
-                                                        "pieceName": "@activepieces/piece-google-sheets",
-                                                        "pieceVersion": "0.16.4",
-                                                        "actionName": "insert_row",
-                                                        "propertySettings": {},
-                                                        "input": {
-                                                          "auth": "{{connections['googleSheets']}}",
-                                                          "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
-                                                          "sheetId": "{{ensure_call_notes.output.worksheet.sheetId}}",
-                                                          "first_row_headers": true,
-                                                          "as_string": false,
-                                                          "values": [
-                                                            "{{log_values.output.noteId}}",
-                                                            "{{log_values.output.dealRef}}",
-                                                            "{{log_values.output.attendee}}",
-                                                            "{{log_values.output.date}}",
-                                                            "{{log_values.output.summary}}",
-                                                            "{{log_values.output.objections}}",
-                                                            "{{log_values.output.commitments}}",
-                                                            "{{log_values.output.tasks}}",
-                                                            "{{log_values.output.source}}",
-                                                            "{{log_values.output.link}}"
-                                                          ]
+                                                        "sourceCode": {
+                                                          "packageJson": "{}",
+                                                          "code": "export const code = async () => {\n  return { dealId: 'deal_' + Date.now().toString(36), createdAt: new Date().toISOString() };\n};"
                                                         },
-                                                        "errorHandlingOptions": {
-                                                          "retryOnFailure": {
-                                                            "value": false
-                                                          },
-                                                          "continueOnFailure": {
-                                                            "value": true
-                                                          }
-                                                        }
+                                                        "input": {}
                                                       },
                                                       "nextAction": {
-                                                        "type": "PIECE",
-                                                        "name": "draft_followup",
-                                                        "displayName": "Draft follow-up email (AI)",
+                                                        "type": "CODE",
+                                                        "name": "log_values",
+                                                        "displayName": "Build row values",
                                                         "valid": true,
                                                         "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                         "settings": {
-                                                          "pieceName": "@activepieces/piece-ai",
-                                                          "pieceVersion": "0.6.0",
-                                                          "actionName": "askAi",
-                                                          "propertySettings": {},
-                                                          "input": {
-                                                            "provider": "activepieces",
-                                                            "model": "openai/gpt-4o-mini",
-                                                            "prompt": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).\n\nWrite a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{finalize_candidate.output.candidate.subject}}\" on {{finalize_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you.\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, signature left blank\"\n}",
-                                                            "creativity": 70,
-                                                            "maxOutputTokens": 1000,
-                                                            "webSearch": false,
-                                                            "webSearchOptions": {}
+                                                          "sourceCode": {
+                                                            "packageJson": "{}",
+                                                            "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  return {\n    noteId: 'note_' + Date.now().toString(36),\n    dealRef: String(params.dealRef ?? ''),\n    nowIso: new Date().toISOString(),\n    attendee: String(ex.externalAttendee ?? ''),\n    date: String(cand.date ?? ''),\n    summary: String(ex.summary ?? ''),\n    objections: JSON.stringify(Array.isArray(ex.objections) ? ex.objections : []),\n    commitments: JSON.stringify(Array.isArray(ex.commitments) ? ex.commitments : []),\n    tasks: JSON.stringify(Array.isArray(ex.tasks) ? ex.tasks : []),\n    priority: String(params.priority ?? 'medium'),\n    source: String(cand.source ?? ''),\n    link: String(cand.link ?? ''),\n    suggestedAccount: String(ex.suggestedAccount ?? ''),\n  };\n};"
                                                           },
-                                                          "errorHandlingOptions": {
-                                                            "retryOnFailure": {
-                                                              "value": false
-                                                            },
-                                                            "continueOnFailure": {
-                                                              "value": true
-                                                            }
+                                                          "input": {
+                                                            "dealRef": "{{new_deal_id.output.dealId}}",
+                                                            "candidate": "{{finalize_candidate.output.candidate}}",
+                                                            "extraction": "{{parse_extraction.output}}",
+                                                            "priority": "{{parse_priority.output.priority}}"
                                                           }
                                                         },
                                                         "nextAction": {
-                                                          "type": "CODE",
-                                                          "name": "parse_draft",
-                                                          "displayName": "Parse draft",
+                                                          "type": "PIECE",
+                                                          "name": "create_deal_sheet",
+                                                          "displayName": "Create deal row",
                                                           "valid": true,
                                                           "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                           "settings": {
-                                                            "sourceCode": {
-                                                              "packageJson": "{}",
-                                                              "code": "export const code = async (params) => {\n  const raw = String(params.draft_followup ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = { email_subject: '', email_body: raw };\n  try { p = JSON.parse(raw); } catch {}\n  let subject = String(p.email_subject ?? '').trim();\n  let body = String(p.email_body ?? '').trim();\n  if (!subject && !body && raw.length === 0) {\n    // AI draft failed entirely: deterministic fallback grounded in the call.\n    const ex = params.extraction ?? {};\n    const cand = params.candidate ?? {};\n    const who = String(ex.externalAttendee ?? '').split('@')[0] || 'there';\n    const lines = [\n      'Hi ' + who + ',',\n      '',\n      'Thanks for the call about \"' + String(cand.subject ?? 'our call') + '\" on ' + String(cand.date ?? '') + '. A quick recap of what we covered:',\n      '',\n    ];\n    if (String(ex.summary ?? '').length > 0) lines.push(String(ex.summary), '');\n    (Array.isArray(ex.objections) ? ex.objections : []).forEach((o) => lines.push('- You raised: ' + o));\n    (Array.isArray(ex.commitments) ? ex.commitments : []).forEach((c) => lines.push('- We agreed: ' + c));\n    (Array.isArray(ex.tasks) ? ex.tasks : []).forEach((t) => lines.push('- Next step: ' + t.task + ' (' + t.owner + ', due ' + t.dueDate + ')'));\n    lines.push('', 'Happy to answer any questions or set up a follow-up.', '', 'Best,', '[Your Name]');\n    subject = 'Following up — ' + String(cand.subject ?? 'our call');\n    body = lines.join('\\n');\n  }\n  return { emailSubject: subject, emailBody: body };\n};"
-                                                            },
+                                                            "pieceName": "@activepieces/piece-google-sheets",
+                                                            "pieceVersion": "0.16.4",
+                                                            "actionName": "insert_row",
+                                                            "propertySettings": {},
                                                             "input": {
-                                                              "draft_followup": "{{draft_followup.output}}",
-                                                              "extraction": "{{parse_extraction.output}}",
-                                                              "candidate": "{{finalize_candidate.output.candidate}}"
+                                                              "auth": "{{connections['googleSheets']}}",
+                                                              "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                              "sheetId": "{{ensure_deals.output.worksheet.sheetId}}",
+                                                              "first_row_headers": true,
+                                                              "as_string": false,
+                                                              "values": [
+                                                                "{{log_values.output.dealRef}}",
+                                                                "{{log_values.output.suggestedAccount}}",
+                                                                "{{log_values.output.suggestedAccount}}",
+                                                                "{{log_values.output.attendee}}",
+                                                                "Discovery",
+                                                                "{{log_values.output.date}}",
+                                                                "{{log_values.output.nowIso}}",
+                                                                "{{log_values.output.priority}}",
+                                                                "Open"
+                                                              ]
+                                                            },
+                                                            "errorHandlingOptions": {
+                                                              "retryOnFailure": {
+                                                                "value": false
+                                                              },
+                                                              "continueOnFailure": {
+                                                                "value": true
+                                                              }
                                                             }
                                                           },
                                                           "nextAction": {
                                                             "type": "PIECE",
-                                                            "name": "create_draft",
-                                                            "displayName": "Save draft to Gmail",
+                                                            "name": "log_contact",
+                                                            "displayName": "Log contact",
                                                             "valid": true,
                                                             "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                             "settings": {
-                                                              "pieceName": "@activepieces/piece-gmail",
-                                                              "pieceVersion": "0.12.7",
-                                                              "actionName": "create_draft_reply",
+                                                              "pieceName": "@activepieces/piece-google-sheets",
+                                                              "pieceVersion": "0.16.4",
+                                                              "actionName": "insert_row",
                                                               "propertySettings": {},
                                                               "input": {
-                                                                "auth": "{{connections['gmail']}}",
-                                                                "message_id": "{{finalize_candidate.output.candidate.id}}",
-                                                                "reply_type": "reply",
-                                                                "body_type": "plain_text",
-                                                                "body": "{{parse_draft.output.emailBody}}",
-                                                                "include_original_message": false
+                                                                "auth": "{{connections['googleSheets']}}",
+                                                                "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                "sheetId": "{{ensure_contacts.output.worksheet.sheetId}}",
+                                                                "first_row_headers": true,
+                                                                "as_string": false,
+                                                                "values": [
+                                                                  "{{log_values.output.attendee}}",
+                                                                  "{{log_values.output.suggestedAccount}}",
+                                                                  "{{log_values.output.date}}",
+                                                                  "{{log_values.output.source}}",
+                                                                  "{{log_values.output.link}}"
+                                                                ]
                                                               },
                                                               "errorHandlingOptions": {
                                                                 "retryOnFailure": {
@@ -704,19 +698,33 @@
                                                             },
                                                             "nextAction": {
                                                               "type": "PIECE",
-                                                              "name": "request_approval",
-                                                              "displayName": "Request approval (Slack)",
+                                                              "name": "log_call_notes",
+                                                              "displayName": "Log call notes",
                                                               "valid": true,
                                                               "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                               "settings": {
-                                                                "pieceName": "@activepieces/piece-slack",
-                                                                "pieceVersion": "0.17.4",
-                                                                "actionName": "request_approval_message",
+                                                                "pieceName": "@activepieces/piece-google-sheets",
+                                                                "pieceVersion": "0.16.4",
+                                                                "actionName": "insert_row",
                                                                 "propertySettings": {},
                                                                 "input": {
-                                                                  "auth": "{{connections['slack']}}",
-                                                                  "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
-                                                                  "text": ":email: *Follow-up draft ready for review*\\nCall: {{finalize_candidate.output.candidate.subject}}\\nDeal: {{log_values.output.dealRef}} · Priority: {{log_values.output.priority}}\\n\\nSubject: {{parse_draft.output.emailSubject}}\\n\\n{{parse_draft.output.emailBody}}\\n\\nApprove to mark the draft sendable (it stays in your Gmail Drafts until you send it)."
+                                                                  "auth": "{{connections['googleSheets']}}",
+                                                                  "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                  "sheetId": "{{ensure_call_notes.output.worksheet.sheetId}}",
+                                                                  "first_row_headers": true,
+                                                                  "as_string": false,
+                                                                  "values": [
+                                                                    "{{log_values.output.noteId}}",
+                                                                    "{{log_values.output.dealRef}}",
+                                                                    "{{log_values.output.attendee}}",
+                                                                    "{{log_values.output.date}}",
+                                                                    "{{log_values.output.summary}}",
+                                                                    "{{log_values.output.objections}}",
+                                                                    "{{log_values.output.commitments}}",
+                                                                    "{{log_values.output.tasks}}",
+                                                                    "{{log_values.output.source}}",
+                                                                    "{{log_values.output.link}}"
+                                                                  ]
                                                                 },
                                                                 "errorHandlingOptions": {
                                                                   "retryOnFailure": {
@@ -728,70 +736,69 @@
                                                                 }
                                                               },
                                                               "nextAction": {
-                                                                "type": "CODE",
-                                                                "name": "approval_outcome",
-                                                                "displayName": "Approval outcome",
+                                                                "type": "PIECE",
+                                                                "name": "draft_followup",
+                                                                "displayName": "Draft follow-up email (AI)",
                                                                 "valid": true,
                                                                 "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                                 "settings": {
-                                                                  "sourceCode": {
-                                                                    "packageJson": "{}",
-                                                                    "code": "export const code = async (params) => {\n  const approved = params.request_approval && typeof params.request_approval.approved === 'boolean'\n    ? params.request_approval.approved\n    : null;\n  const status = approved === true ? 'approved' : approved === false ? 'rejected' : 'pending';\n  return { approved, status };\n};"
-                                                                  },
+                                                                  "pieceName": "@activepieces/piece-ai",
+                                                                  "pieceVersion": "0.6.0",
+                                                                  "actionName": "askAi",
+                                                                  "propertySettings": {},
                                                                   "input": {
-                                                                    "request_approval": "{{request_approval.output}}"
+                                                                    "provider": "activepieces",
+                                                                    "model": "openai/gpt-4o-mini",
+                                                                    "prompt": "You draft concise, specific sales follow-up emails. Ground every sentence in the call facts provided. Never invent facts, numbers, or promises. Plain text only, no markdown. Leave the signature block blank (the rep signs).\n\nWrite a follow-up email to {{parse_extraction.output.externalAttendee}} about the call \"{{finalize_candidate.output.candidate.subject}}\" on {{finalize_candidate.output.candidate.date}}.\n\nReference the specific concerns and specific promises from the call — never a generic thank-you.\n\nSummary: {{parse_extraction.output.summary}}\nObjections raised: {{parse_extraction.output.objections}}\nCommitments made: {{parse_extraction.output.commitments}}\nNext steps: {{parse_extraction.output.tasks}}\n\nReturn ONLY valid JSON:\n{\n  \"email_subject\": \"string\",\n  \"email_body\": \"string — plain text, signature left blank\"\n}",
+                                                                    "creativity": 70,
+                                                                    "maxOutputTokens": 1000,
+                                                                    "webSearch": false,
+                                                                    "webSearchOptions": {}
+                                                                  },
+                                                                  "errorHandlingOptions": {
+                                                                    "retryOnFailure": {
+                                                                      "value": false
+                                                                    },
+                                                                    "continueOnFailure": {
+                                                                      "value": true
+                                                                    }
                                                                   }
                                                                 },
                                                                 "nextAction": {
-                                                                  "type": "PIECE",
-                                                                  "name": "post_recap",
-                                                                  "displayName": "Post recap to Slack",
+                                                                  "type": "CODE",
+                                                                  "name": "parse_draft",
+                                                                  "displayName": "Parse draft",
                                                                   "valid": true,
                                                                   "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                                   "settings": {
-                                                                    "pieceName": "@activepieces/piece-slack",
-                                                                    "pieceVersion": "0.17.4",
-                                                                    "actionName": "send_channel_message",
-                                                                    "propertySettings": {},
-                                                                    "input": {
-                                                                      "auth": "{{connections['slack']}}",
-                                                                      "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
-                                                                      "text": ":white_check_mark: *Call logged — {{finalize_candidate.output.candidate.subject}}*\\n• Source: {{finalize_candidate.output.candidate.source}} · {{finalize_candidate.output.candidate.date}}\\n• Deal: {{log_values.output.dealRef}} · Priority: {{log_values.output.priority}}\\n• Approval: {{approval_outcome.output.status}}\\n• Summary: {{parse_extraction.output.summary}}\\n• Objections: {{parse_extraction.output.objections}}\\n• Commitments: {{parse_extraction.output.commitments}}\\n• Transcript: {{finalize_candidate.output.candidate.link}}\\n\\n*Follow-up draft* (saved to your Gmail Drafts):\\nSubject: {{parse_draft.output.emailSubject}}\\n\\n{{parse_draft.output.emailBody}}\\n\\nNothing sends automatically — the draft is yours to send from Gmail."
+                                                                    "sourceCode": {
+                                                                      "packageJson": "{}",
+                                                                      "code": "export const code = async (params) => {\n  const raw = String(params.draft_followup ?? '')\n    .replace(/\\`\\`\\`json/gi, '')\n    .replace(/\\`\\`\\`/g, '')\n    .trim();\n  let p = { email_subject: '', email_body: raw };\n  try { p = JSON.parse(raw); } catch {}\n  let subject = String(p.email_subject ?? '').trim();\n  let body = String(p.email_body ?? '').trim();\n  if (!subject && !body && raw.length === 0) {\n    // AI draft failed entirely: deterministic fallback grounded in the call.\n    const ex = params.extraction ?? {};\n    const cand = params.candidate ?? {};\n    const who = String(ex.externalAttendee ?? '').split('@')[0] || 'there';\n    const lines = [\n      'Hi ' + who + ',',\n      '',\n      'Thanks for the call about \"' + String(cand.subject ?? 'our call') + '\" on ' + String(cand.date ?? '') + '. A quick recap of what we covered:',\n      '',\n    ];\n    if (String(ex.summary ?? '').length > 0) lines.push(String(ex.summary), '');\n    (Array.isArray(ex.objections) ? ex.objections : []).forEach((o) => lines.push('- You raised: ' + o));\n    (Array.isArray(ex.commitments) ? ex.commitments : []).forEach((c) => lines.push('- We agreed: ' + c));\n    (Array.isArray(ex.tasks) ? ex.tasks : []).forEach((t) => lines.push('- Next step: ' + t.task + ' (' + t.owner + ', due ' + t.dueDate + ')'));\n    lines.push('', 'Happy to answer any questions or set up a follow-up.', '', 'Best,', '[Your Name]');\n    subject = 'Following up — ' + String(cand.subject ?? 'our call');\n    body = lines.join('\\n');\n  }\n  return { emailSubject: subject, emailBody: body };\n};"
                                                                     },
-                                                                    "errorHandlingOptions": {
-                                                                      "retryOnFailure": {
-                                                                        "value": false
-                                                                      },
-                                                                      "continueOnFailure": {
-                                                                        "value": true
-                                                                      }
+                                                                    "input": {
+                                                                      "draft_followup": "{{draft_followup.output}}",
+                                                                      "extraction": "{{parse_extraction.output}}",
+                                                                      "candidate": "{{finalize_candidate.output.candidate}}"
                                                                     }
                                                                   },
                                                                   "nextAction": {
                                                                     "type": "PIECE",
-                                                                    "name": "log_processed",
-                                                                    "displayName": "Mark processed",
+                                                                    "name": "create_draft",
+                                                                    "displayName": "Save draft to Gmail",
                                                                     "valid": true,
                                                                     "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                                     "settings": {
-                                                                      "pieceName": "@activepieces/piece-google-sheets",
-                                                                      "pieceVersion": "0.16.4",
-                                                                      "actionName": "insert_row",
+                                                                      "pieceName": "@activepieces/piece-gmail",
+                                                                      "pieceVersion": "0.12.7",
+                                                                      "actionName": "create_draft_reply",
                                                                       "propertySettings": {},
                                                                       "input": {
-                                                                        "auth": "{{connections['googleSheets']}}",
-                                                                        "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
-                                                                        "sheetId": "{{ensure_processed.output.worksheet.sheetId}}",
-                                                                        "first_row_headers": true,
-                                                                        "as_string": false,
-                                                                        "values": [
-                                                                          "{{finalize_candidate.output.fingerprint}}",
-                                                                          "{{finalize_candidate.output.candidate.source}}",
-                                                                          "{{log_values.output.nowIso}}",
-                                                                          "logged",
-                                                                          "{{log_values.output.dealRef}}",
-                                                                          "{{approval_outcome.output.status}}"
-                                                                        ]
+                                                                        "auth": "{{connections['gmail']}}",
+                                                                        "message_id": "{{finalize_candidate.output.candidate.id}}",
+                                                                        "reply_type": "reply",
+                                                                        "body_type": "plain_text",
+                                                                        "body": "{{parse_draft.output.emailBody}}",
+                                                                        "include_original_message": false
                                                                       },
                                                                       "errorHandlingOptions": {
                                                                         "retryOnFailure": {
@@ -803,36 +810,145 @@
                                                                       }
                                                                     },
                                                                     "nextAction": {
-                                                                      "type": "CODE",
-                                                                      "name": "run_summary",
-                                                                      "displayName": "Run summary",
+                                                                      "type": "PIECE",
+                                                                      "name": "request_approval",
+                                                                      "displayName": "Request approval (Slack)",
                                                                       "valid": true,
                                                                       "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
                                                                       "settings": {
-                                                                        "sourceCode": {
-                                                                          "packageJson": "{}",
-                                                                          "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  if (params.contentUnavailable) warnings.push('Drive transcript content not readable on this runner — processed via fallback transcript');\n  const tabs = {};\n  for (const key of ['deals', 'contacts', 'callNotes', 'tasks', 'processed']) {\n    const t = params[key] ?? {};\n    tabs[key] = { found: !!t.found, created: !!t.created, sheetId: t.worksheet?.sheetId ?? null };\n  }\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    approval: { status: String(params.approval?.status ?? 'pending'), approved: params.approval?.approved ?? null },\n    priority: String(params.priority ?? 'medium'),\n    runAt: new Date().toISOString(),\n    dealRef: String(params.dealRef ?? ''),\n    sources: { gmailFound: Number(params.gmailFound ?? 0), driveFound: Number(params.driveFound ?? 0) },\n    tabs,\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      contentSource: cand.contentSource ?? cand.source ?? '',\n      usedDemo: !!cand.usedDemo,\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    warnings,\n  };\n};"
-                                                                        },
+                                                                        "pieceName": "@activepieces/piece-slack",
+                                                                        "pieceVersion": "0.17.4",
+                                                                        "actionName": "request_approval_message",
+                                                                        "propertySettings": {},
                                                                         "input": {
-                                                                          "outcome": "processed",
-                                                                          "dealRef": "{{log_values.output.dealRef}}",
-                                                                          "candidate": "{{finalize_candidate.output.candidate}}",
-                                                                          "fingerprint": "{{finalize_candidate.output.fingerprint}}",
-                                                                          "extraction": "{{parse_extraction.output}}",
-                                                                          "draft": "{{parse_draft.output}}",
-                                                                          "approval": "{{approval_outcome.output}}",
-                                                                          "priority": "{{log_values.output.priority}}",
-                                                                          "gmailFound": "{{pick_candidate.output.gmailFound}}",
-                                                                          "driveFound": "{{pick_candidate.output.driveFound}}",
-                                                                          "contentUnavailable": "{{finalize_candidate.output.contentUnavailable}}",
-                                                                          "deals": "{{ensure_deals.output}}",
-                                                                          "contacts": "{{ensure_contacts.output}}",
-                                                                          "callNotes": "{{ensure_call_notes.output}}",
-                                                                          "tasks": "{{ensure_tasks.output}}",
-                                                                          "processed": "{{ensure_processed.output}}"
+                                                                          "auth": "{{connections['slack']}}",
+                                                                          "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
+                                                                          "text": ":email: *Follow-up draft ready for review*\\nCall: {{finalize_candidate.output.candidate.subject}}\\nDeal: {{log_values.output.dealRef}} · Priority: {{log_values.output.priority}}\\n\\nSubject: {{parse_draft.output.emailSubject}}\\n\\n{{parse_draft.output.emailBody}}\\n\\nApprove to mark the draft sendable (it stays in your Gmail Drafts until you send it)."
+                                                                        },
+                                                                        "errorHandlingOptions": {
+                                                                          "retryOnFailure": {
+                                                                            "value": false
+                                                                          },
+                                                                          "continueOnFailure": {
+                                                                            "value": true
+                                                                          }
                                                                         }
                                                                       },
-                                                                      "nextAction": null
+                                                                      "nextAction": {
+                                                                        "type": "CODE",
+                                                                        "name": "approval_outcome",
+                                                                        "displayName": "Approval outcome",
+                                                                        "valid": true,
+                                                                        "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                                                        "settings": {
+                                                                          "sourceCode": {
+                                                                            "packageJson": "{}",
+                                                                            "code": "export const code = async (params) => {\n  const approved = params.request_approval && typeof params.request_approval.approved === 'boolean'\n    ? params.request_approval.approved\n    : null;\n  const status = approved === true ? 'approved' : approved === false ? 'rejected' : 'pending';\n  return { approved, status };\n};"
+                                                                          },
+                                                                          "input": {
+                                                                            "request_approval": "{{request_approval.output}}"
+                                                                          }
+                                                                        },
+                                                                        "nextAction": {
+                                                                          "type": "PIECE",
+                                                                          "name": "post_recap",
+                                                                          "displayName": "Post recap to Slack",
+                                                                          "valid": true,
+                                                                          "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                                                          "settings": {
+                                                                            "pieceName": "@activepieces/piece-slack",
+                                                                            "pieceVersion": "0.17.4",
+                                                                            "actionName": "send_channel_message",
+                                                                            "propertySettings": {},
+                                                                            "input": {
+                                                                              "auth": "{{connections['slack']}}",
+                                                                              "channel": "REPLACE_WITH_SLACK_CHANNEL_ID",
+                                                                              "text": ":white_check_mark: *Call logged — {{finalize_candidate.output.candidate.subject}}*\\n• Source: {{finalize_candidate.output.candidate.source}} · {{finalize_candidate.output.candidate.date}}\\n• Deal: {{log_values.output.dealRef}} · Priority: {{log_values.output.priority}}\\n• Approval: {{approval_outcome.output.status}}\\n• Summary: {{parse_extraction.output.summary}}\\n• Objections: {{parse_extraction.output.objections}}\\n• Commitments: {{parse_extraction.output.commitments}}\\n• Transcript: {{finalize_candidate.output.candidate.link}}\\n\\n*Follow-up draft* (saved to your Gmail Drafts):\\nSubject: {{parse_draft.output.emailSubject}}\\n\\n{{parse_draft.output.emailBody}}\\n\\nNothing sends automatically — the draft is yours to send from Gmail."
+                                                                            },
+                                                                            "errorHandlingOptions": {
+                                                                              "retryOnFailure": {
+                                                                                "value": false
+                                                                              },
+                                                                              "continueOnFailure": {
+                                                                                "value": true
+                                                                              }
+                                                                            }
+                                                                          },
+                                                                          "nextAction": {
+                                                                            "type": "PIECE",
+                                                                            "name": "log_processed",
+                                                                            "displayName": "Mark processed",
+                                                                            "valid": true,
+                                                                            "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                                                            "settings": {
+                                                                              "pieceName": "@activepieces/piece-google-sheets",
+                                                                              "pieceVersion": "0.16.4",
+                                                                              "actionName": "insert_row",
+                                                                              "propertySettings": {},
+                                                                              "input": {
+                                                                                "auth": "{{connections['googleSheets']}}",
+                                                                                "spreadsheetId": "REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID",
+                                                                                "sheetId": "{{ensure_processed.output.worksheet.sheetId}}",
+                                                                                "first_row_headers": true,
+                                                                                "as_string": false,
+                                                                                "values": [
+                                                                                  "{{finalize_candidate.output.fingerprint}}",
+                                                                                  "{{finalize_candidate.output.candidate.source}}",
+                                                                                  "{{log_values.output.nowIso}}",
+                                                                                  "logged",
+                                                                                  "{{log_values.output.dealRef}}",
+                                                                                  "{{approval_outcome.output.status}}"
+                                                                                ]
+                                                                              },
+                                                                              "errorHandlingOptions": {
+                                                                                "retryOnFailure": {
+                                                                                  "value": false
+                                                                                },
+                                                                                "continueOnFailure": {
+                                                                                  "value": true
+                                                                                }
+                                                                              }
+                                                                            },
+                                                                            "nextAction": {
+                                                                              "type": "CODE",
+                                                                              "name": "run_summary",
+                                                                              "displayName": "Run summary",
+                                                                              "valid": true,
+                                                                              "lastUpdatedDate": "2026-08-14T00:00:00.000Z",
+                                                                              "settings": {
+                                                                                "sourceCode": {
+                                                                                  "packageJson": "{}",
+                                                                                  "code": "export const code = async (params) => {\n  const cand = params.candidate ?? {};\n  const ex = params.extraction ?? {};\n  const draft = params.draft ?? {};\n  const warnings = [];\n  if (!cand?.subject) warnings.push('no candidate transcript found this sweep');\n  if (!ex?.summary) warnings.push('extraction empty (AI provider unavailable or transcript unreadable)');\n  if (!draft?.emailSubject) warnings.push('follow-up draft empty');\n  if (params.contentUnavailable) warnings.push('Drive transcript content not readable on this runner — processed via fallback transcript');\n  if (!params.hubspotHasEmail) warnings.push('no external attendee email — HubSpot contact not upserted');\n  const hs = {\n    contactId: params.hubspot_contact_id ?? null,\n    dealId: params.hubspot_deal_id ?? null,\n    associated: params.hubspot_associations ?? 0,\n    attempted: !!params.hubspot_attempted,\n  };\n  const tabs = {};\n  for (const key of ['deals', 'contacts', 'callNotes', 'tasks', 'processed']) {\n    const t = params[key] ?? {};\n    tabs[key] = { found: !!t.found, created: !!t.created, sheetId: t.worksheet?.sheetId ?? null };\n  }\n  return {\n    agent: 'Sales Call Logger & Follow-up Drafter',\n    status: 'completed',\n    outcome: String(params.outcome ?? 'processed'),\n    approval: { status: String(params.approval?.status ?? 'pending'), approved: params.approval?.approved ?? null },\n    priority: String(params.priority ?? 'medium'),\n    runAt: new Date().toISOString(),\n    dealRef: String(params.dealRef ?? ''),\n    sources: { gmailFound: Number(params.gmailFound ?? 0), driveFound: Number(params.driveFound ?? 0) },\n    tabs,\n    candidate: {\n      id: cand.id ?? null,\n      subject: cand.subject ?? '',\n      from: cand.from ?? '',\n      date: cand.date ?? '',\n      source: cand.source ?? '',\n      contentSource: cand.contentSource ?? cand.source ?? '',\n      usedDemo: !!cand.usedDemo,\n      link: cand.link ?? '',\n    },\n    fingerprint: params.fingerprint ?? '',\n    extraction: {\n      summary: ex.summary ?? '',\n      objections: Array.isArray(ex.objections) ? ex.objections : [],\n      commitments: Array.isArray(ex.commitments) ? ex.commitments : [],\n      tasks: Array.isArray(ex.tasks) ? ex.tasks : [],\n      stageSignal: ex.stageSignal ?? null,\n      externalAttendee: ex.externalAttendee ?? '',\n      hasExternal: ex.hasExternal ?? false,\n      suggestedAccount: ex.suggestedAccount ?? '',\n    },\n    followupDraft: {\n      emailSubject: draft.emailSubject ?? '',\n      emailBody: draft.emailBody ?? '',\n    },\n    hubspot: {\n      contactId: hs.contactId ?? null,\n      dealId: hs.dealId ?? null,\n      associated: Number(hs.associated ?? 0) >= 1,\n      attempted: !!hs.attempted,\n    },\n    warnings,\n  };\n};"
+                                                                                },
+                                                                                "input": {
+                                                                                  "outcome": "processed",
+                                                                                  "dealRef": "{{log_values.output.dealRef}}",
+                                                                                  "candidate": "{{finalize_candidate.output.candidate}}",
+                                                                                  "fingerprint": "{{finalize_candidate.output.fingerprint}}",
+                                                                                  "extraction": "{{parse_extraction.output}}",
+                                                                                  "draft": "{{parse_draft.output}}",
+                                                                                  "approval": "{{approval_outcome.output}}",
+                                                                                  "priority": "{{log_values.output.priority}}",
+                                                                                  "gmailFound": "{{pick_candidate.output.gmailFound}}",
+                                                                                  "driveFound": "{{pick_candidate.output.driveFound}}",
+                                                                                  "contentUnavailable": "{{finalize_candidate.output.contentUnavailable}}",
+                                                                                  "deals": "{{ensure_deals.output}}",
+                                                                                  "contacts": "{{ensure_contacts.output}}",
+                                                                                  "callNotes": "{{ensure_call_notes.output}}",
+                                                                                  "tasks": "{{ensure_tasks.output}}",
+                                                                                  "processed": "{{ensure_processed.output}}",
+                                                                                  "hubspot_contact_id": "{{hubspot_contact.output.id}}",
+                                                                                  "hubspot_deal_id": "{{hubspot_deal.output.id}}",
+                                                                                  "hubspot_associations": "{{hubspot_associate.output.totalAssociations}}",
+                                                                                  "hubspot_attempted": true,
+                                                                                  "hubspotHasEmail": "{{hubspot_values.output.hasEmail}}"
+                                                                                }
+                                                                              },
+                                                                              "nextAction": null
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                      }
                                                                     }
                                                                   }
                                                                 }
