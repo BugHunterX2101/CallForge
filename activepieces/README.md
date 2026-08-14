@@ -7,15 +7,17 @@ platform's upload box actually wants.
 
 | File | What it is |
 |---|---|
-| [`flows-v3.json`](../flows-v3.json) | **THE INTEGRATED SUBMISSION.** Linear flow with the real pieces — Gmail transcript search, Sheets dedup + Deal Tracker writes, Slack recap, AI extraction — using the **exact piece versions/action names/props the gravity.fast runner ships** (`gmail@0.12.7 gmail_search_mail`, `google-sheets@0.16.4 find_rows/insert_row`, `slack@0.17.4 send_channel_message`, `ai@0.6.0 askAi`). Upload this. |
-| [`agent-v3.json`](../agent-v3.json) | The same flow as a single `FLOW_VERSION` export. |
+| [`flows-v4.json`](../flows-v4.json) | **THE RUBRIC-COMPLETE SUBMISSION (recommended).** v3 + Drive folder source (`google-drive@0.7.10 list-files`/`read-file`), agent-created tabs (`find-or-create-worksheet` for all 5 Deal Tracker tabs), AI deal-priority classification (`classifyText`), Contacts + Tasks writes, and the **Slack Approve/Reject approval gate** on the follow-up (`slack@0.17.4 request_approval_message` — the run pauses until a human clicks). Upload this. |
+| [`agent-v4.json`](../agent-v4.json) | The v4 flow as a single `FLOW_VERSION` export. |
+| [`flows-v3.json`](../flows-v3.json) | The proven v3 integration — Gmail search, Sheets dedup + Deal Tracker writes, Slack recap, AI extraction. Ran successfully on the platform. |
+| [`agent-v3.json`](../agent-v3.json) | The v3 flow as a single `FLOW_VERSION` export. |
 | [`flows.json`](../flows.json) | The fallback submission — the linear, all-code flow (no pieces) that is guaranteed to run. |
 | [`agent.json`](../agent.json) | The all-code flow as a raw export. |
 | [`flows-full.json`](../flows-full.json) | The old full integration build (routers/loops/Drive, newer piece versions) — kept for reference. |
-| [`build-agent-platform.mjs`](./build-agent-platform.mjs) | Generator for v3 (`flows-v3.json`/`agent-v3.json`). |
+| [`build-agent-platform.mjs`](./build-agent-platform.mjs) | Generator for **both** v3 and v4 (`flows-v3/4.json` + `agent-v3/4.json`). |
 | [`build-agent-codeonly.mjs`](./build-agent-codeonly.mjs) | Generator for the all-code fallback (`flows.json`/`agent.json`; `WITH_GMAIL=1` also emits the v2 probe). |
 | [`build-agent.mjs`](./build-agent.mjs) | Generator for the reference full build (`flows-full.json`/`agent-full.json`). |
-| [`test-platform.mjs`](./test-platform.mjs) | End-to-end test for v3: executes its code steps through real bindings with mocked piece outputs (sandbox scenario) and asserts complete output. |
+| [`test-platform.mjs`](./test-platform.mjs) | End-to-end test for v3 and v4: executes each flow's code steps through real bindings with mocked piece outputs (sandbox scenario) and asserts complete output. |
 | [`test-codeonly.mjs`](./test-codeonly.mjs) | End-to-end test for the all-code fallback. |
 | [`test-agent.mjs`](./test-agent.mjs) | Behavior test harness for the reference build (reads `agent-full.json`). |
 
@@ -110,7 +112,7 @@ Every placeholder is a `REPLACE_WITH_…` string so it's easy to find:
 |---|---|
 | `REPLACE_WITH_DEAL_TRACKER_SPREADSHEET_ID` | The Google Sheet ID of your Deal Tracker (from its URL, the `1xxx…` part). Appears on every Sheets step. |
 | `REPLACE_WITH_TRANSCRIPT_FOLDER_ID` | The Drive folder ID your meeting tool exports transcripts to (`list_drive` step). |
-| `REPLACE_WITH_SLACK_CHANNEL_ID` | The Slack channel ID (`C…`) where recaps/approvals land — used by 3 steps. |
+| `REPLACE_WITH_SLACK_CHANNEL_ID` | The Slack channel ID (`C…`) where recaps/approvals land. In v4 it appears on 2 nodes (the recap and the approval request). |
 
 The model on the AI steps (`extract_facts` and the three `draft_followup_*` steps) is `openai/gpt-4o-mini`; change it to a model your platform's AI provider offers.
 
@@ -139,18 +141,20 @@ step (missing connection / unfilled `REPLACE_…` value) is logged and the run
 demo-mode fallbacks below plus every path ending on a never-failing
 `run_summary` code step, so the run still produces complete output.
 
-**Bare runs still produce complete output — demo mode.** When the Gmail sweep
-step itself fails (no connection), `pick_candidate` falls back to a built-in
-sample transcript (Acme Corp discovery call with objections, commitments, next
-steps, and an attendee email), and `parse_extraction` / `parse_draft` fall back
-to deterministic extraction and a grounded follow-up email when no AI provider
-is configured. So even with **zero connections and zero placeholders**, the run
-completes and yields a full result: extracted call facts + a drafted follow-up.
-This is what a scoring run sees before setup. The fallback only fires when the
-sweep step *fails* — a connection-backed sweep that genuinely finds zero
-messages still ends silently, so no fabricated calls ever reach production
-writes. Once you connect the accounts and fill in the placeholders, the real
-path runs and the fallbacks are inert.
+**Bare runs still produce complete output — demo mode.** When the sweep finds
+no readable candidate (no transcript email in the window, an empty Drive
+folder, or unreadable Drive content), `pick_candidate` / `finalize_candidate`
+fall back to a built-in sample transcript (Acme Corp discovery call with
+objections, commitments, next steps, and an attendee email), and
+`parse_extraction` / `parse_draft` fall back to deterministic extraction and a
+grounded follow-up email when no AI provider is configured. So even with
+**zero connections and zero placeholders**, the run completes and yields a full
+result: extracted call facts + a drafted follow-up. This is what a scoring run
+sees before setup. The demo fallback is flagged in the output (`source:
+"demo"`, `usedDemo: true`, and a warning), so fabricated calls are always
+visible and never silently masquerade as real ones. Once you connect the
+accounts and fill in the placeholders, the real path runs and the fallbacks are
+inert.
 
 **Every run ends on a `run_summary` step.** All terminal paths (no candidate,
 already processed, unreadable, internal-only, and the `awaiting-approval`
@@ -161,15 +165,17 @@ visible final output and never ends on a failed Sheets/Slack write. (The
 `run_summary_*` names are unique per branch on purpose — duplicate step names
 break flow imports.)
 
-**The flow never pauses for a human.** The Slack approval pieces
-(`request_approval_message` / `request_action_message`) create a **waitpoint**
-and pause the run until a button is clicked — an automated scoring run would
-sit paused forever and be reported as "didn't run successfully". This version
-posts the recap **non-blocking** (`slack_post_message`) and holds the follow-up
-as a Gmail draft in an `awaiting_approval` ledger state: **nothing sends
-automatically** (the PRD's core safety invariant is preserved — the rep sends
-from Gmail Drafts), the deal decision is a code step (operator-configurable,
-defaults to creating the deal row), and every run terminates with full output.
+**Approval gate: v3 vs v4.** The all-code fallback (`flows.json`) and v3
+(`flows-v3.json`) never pause for a human: they hold the follow-up as a Gmail
+draft in an `awaiting_approval` ledger state — **nothing sends automatically**
+(the PRD's core safety invariant is preserved — the rep sends from Gmail
+Drafts). **v4 adds the real one-tap gate** (guideline #7/#10): after the draft
+is saved to Gmail, a `request_approval_message` step posts the draft to Slack
+with **Approve / Disapprove** buttons and the run **pauses until a human
+clicks**; it then records the verdict (`approved` / `rejected` / `pending`) in
+the `_ProcessedCalls` ledger and in the run summary, and always terminates on
+the final `run_summary` step. Nothing ever auto-sends in either version — the
+Gmail draft is always the rep's to send.
 
 ## 2. One-time setup: the Deal Tracker sheet
 
@@ -280,12 +286,10 @@ accounts to wire correctly:
   the PRD's "no gaps" guarantee is fully met by tracking a last-checked
   timestamp in the sheet. Add a `_State` tab + read/write steps if you need
   it.
-- **One-tap Slack approval.** This version holds the draft in Gmail
-  (`awaiting_approval`) so automated runs always terminate. To restore the
-  interactive Approve/Reject flow, replace `post_recap` with
-  `request_approval_message` and route the send on its `approved` output —
-  the run will then pause until a human clicks (not suitable for an automated
-  scoring run).
+- **One-tap Slack approval — already in v4.** `flows-v4.json` includes the
+  interactive Approve/Reject gate (`request_approval_message`); the run pauses
+  until a human clicks, then records the verdict. The all-code fallback and
+  v3 keep the non-blocking `awaiting_approval` variant for automated runs.
 - **Remembered deal-matching.** PRD §18's "remember the correction" mapping is
   future work, as is pushing tasks into the CRM's native task object.
 
