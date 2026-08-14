@@ -7,7 +7,7 @@ platform's upload box actually wants.
 
 | File | What it is |
 |---|---|
-| [`flows-v5.json`](../flows-v5.json) | **THE CURRENT SUBMISSION (recommended).** Everything in v4 **plus the HubSpot CRM sync** (`@activepieces/piece-hubspot@0.8.9`): contact upsert keyed on email (`create-or-update-contact`), deal opened on the default pipeline (`create-deal`), contact↔deal link (`create-associations`) — the acceptance criteria that are CRM-shaped ("deal updated, call logged against the deal"). Upload this. |
+| [`flows-v5.json`](../flows-v5.json) | **THE CURRENT SUBMISSION (recommended).** Everything in v4 **plus the HubSpot CRM sync** (`@activepieces/piece-hubspot@0.8.9`): contact upsert keyed on email (`create-or-update-contact`), deal opened on the default pipeline (`create-deal`), contact↔deal link (`create-associations`) — the acceptance criteria that are CRM-shaped ("deal updated, call logged against the deal"). **Ran successfully on the platform with all five tools live** (Gmail, Drive, Sheets, Slack, HubSpot). Upload this. |
 | [`agent-v5.json`](../agent-v5.json) | The v5 flow as a single `FLOW_VERSION` export. |
 | [`flows-v4.json`](../flows-v4.json) | The rubric-complete v4 — Drive folder source (`google-drive@0.7.10 list-files`/`read-file`), agent-created tabs (`find-or-create-worksheet` for all 5 Deal Tracker tabs), AI deal-priority classification (`classifyText`), Contacts + Tasks writes, and the **Slack Approve/Reject approval gate** on the follow-up (`slack@0.17.4 request_approval_message` — the run pauses until a human clicks). Ran successfully on the platform. |
 | [`agent-v4.json`](../agent-v4.json) | The v4 flow as a single `FLOW_VERSION` export. |
@@ -35,30 +35,34 @@ apps catalog + the npm tarballs at those versions), the correct names are
 a name that does not exist in the platform's bundle — the step could not even
 be built. v3 uses only names/props that exist in the platform's exact versions.
 
-**Which file to upload?** If the box accepts a template / "flows" list, use
-`flows.json`. If it wants a single flow export, use `agent.json`. Both are the
-same linear all-code flow, validated against `@activepieces/shared` schemas
-(`SharedTemplate` / `FlowVersionTemplate`).
+**Which file to upload?** The platform's upload box accepts a template /
+"flows" list shape via its **Paste JSON** tab — upload **`flows-v5.json`**
+(and `agent-v5.json` if it wants a single flow export). The all-code
+`flows.json`/`agent.json` remain as the guaranteed-to-run fallback: the same
+pipeline with zero pieces, so a run can never fail — but it cannot earn the
+integration rubric points, so it is a fallback, not the submission.
 
-**Why the submission is all-code.** The bounty platform's runner repeatedly
-reported the fully-integrated flow (pieces/routers/loops/connections, both the
-decorated and bare shapes) as *"didn't run successfully / No output to
-display"*, while a **minimal flow of a schedule trigger + a bare code step
-was accepted and ran**. The submission therefore contains only the step types
-with positive evidence of executing on that runner: the schedule trigger and
-bare code steps. It implements the full pipeline — sweep window, candidate
-picking with dedup fingerprint, readability check, extraction (objections,
-commitments, next steps, attendee), deal decision, a follow-up draft grounded
-in the extracted facts, and a final `run_summary` that returns the complete
-agent result as JSON. Nothing in it can fail: no network, no auth, no external
-APIs — so the run always finishes with visible, complete output.
+**Why the submission is integrated now (v3→v5), and what the all-code
+fallback is for.** The platform's runner repeatedly reported the first
+fully-integrated flows as *"didn't run successfully / No output to display"*
+while a minimal schedule-trigger + bare-code flow ran. The root cause turned
+out not to be "pieces don't run here": it was **action names and piece
+versions from newer packages that don't exist in the platform's bundles** —
+`gmail_search_email` vs its actual `gmail_search_mail`, `sheets_add_row` vs
+`insert_row`, `slack_post_message` vs `send_channel_message`, etc. A step
+referencing a nonexistent action cannot even be built, which killed the whole
+run at its first piece step. The all-code fallback (`flows.json`) is the
+pipeline with those integration layers removed; v3 re-added Gmail/Sheets/Slack/
+AI with **platform-exact names and versions**, v4 added Drive + agent-created
+tabs + the Slack approval gate, and v5 added the HubSpot CRM sync. Each
+integrated version was uploaded and **ran successfully on the platform** — so
+the current submission is the full real integration, not a stand-in.
 
-Every identifier inside `agent.json` — piece names, versions, action/trigger
-names, property keys, output paths, the `FLOW_VERSION` schema — was verified
-against the published `@activepieces/shared` package, the real piece bundles
-on npm, and by **importing the export into a real ActivePieces server
-(`ghcr.io/activepieces/activepieces:0.87.0`)** via its own `IMPORT_FLOW` API
-(see "Schema & versions").
+Every identifier inside the v3-v5 artifacts — piece names, versions,
+action/trigger names, property keys, output paths, the `FLOW_VERSION` schema
+— was verified against the platform's own apps catalog, the exact npm bundles
+at those versions, and the published `@activepieces/shared` package (see
+"Schema & versions").
 
 **Important:** the flow's trigger is named `trigger` on purpose. The import
 path (`IMPORT_FLOW`) creates a fresh empty flow version whose trigger is always
@@ -69,42 +73,57 @@ it.
 
 ---
 
-## 1. Import it
+## 1. Import it (v5)
 
-1. Open the platform's upload box (or **Paste JSON** tab) and supply
-   `flows.json` (or `agent.json` if it wants a single flow export).
-2. You'll see a flow named **Sales Call Logger & Follow-up Drafter**: a
-   scheduled trigger (every 5 minutes) and 10 code steps that run the whole
-   pipeline and end on a `Run summary` step returning the complete agent
-   result as JSON.
-3. No connections, no OAuth, no placeholders — the submission is fully
-   self-contained, so every run finishes with visible output.
+1. Open the platform's upload box, **Paste JSON** tab, and supply
+   **`flows-v5.json`** (or `agent-v5.json` if it wants a single flow export).
+2. The flow **Sales Call Logger & Follow-up Drafter** loads with 36 nodes — a
+   scheduled trigger (every 5 minutes) plus the linear pipeline, ending on a
+   `Run summary` step that returns the complete agent result as JSON.
+3. On the **"Choose what to ask the user"** step, the flow has **3
+   ask-user values** (spreadsheet id ×10 nodes, Drive folder id ×1, Slack
+   channel ×2) — toggle them ON and bind, then Continue and write the three
+   questions.
+4. Connect the **5 OAuth tools** (Gmail, Google Drive, Google Sheets, Slack,
+   **HubSpot** — one click each).
+5. Email a transcript to the connected Gmail within 15 minutes of the run,
+   answer the three questions with your real IDs, and run. The run pauses at
+   the Slack **Approve/Disapprove** gate — click Approve to resume.
 
-### Layering real integrations back (the `-full` build)
+### Fallback builds
 
-The integration build (`flows-full.json` / `agent-full.json`, generated by
-`build-agent.mjs`) is the same agent with real Gmail/Drive/Sheets/Slack/AI
-pieces, routers, loops and `{{connections[...]}}` refs. It was verified to
-import and run on a real ActivePieces server, but the bounty platform's runner
-has not executed it — layering it back in is deliberately a step-by-step
-process (add one piece type, upload, verify) so a single unsupported step can
-never take the whole run down again.
+- `flows.json` / `agent.json` — the **all-code** fallback (no pieces, no
+  connections, no placeholders): guaranteed to run end-to-end and produce
+  complete output, but with no real integrations. Use it only if the
+  integrated upload is rejected.
+- `flows-full.json` / `agent-full.json` (`build-agent.mjs`) — the **legacy
+  reference build** (routers, loops, Drive download, newer piece versions).
+  Superseded: the v3→v5 sequence *is* the layering done, verified piece by
+  piece on the platform's runner. Kept only for reference.
 
-### Connections to create (one click each, OAuth) — integration build only
+### Connections to create (one click each, OAuth) — v5
 
-| Connection | Used by |
+| Connection | Used by (platform-exact actions) |
 |---|---|
-| **Gmail** (`{{connections['gmail']}}`) | `gmail_search_email`, `gmail_create_draft`, `gmail_send_draft` |
-| **Google Drive** (`{{connections['googleDrive']}}`) | `drive_list_files` |
-| **Google Sheets** (`{{connections['googleSheets']}}`) | all Deal Tracker reads/writes |
-| **Slack** (`{{connections['slack']}}`) | recap message, deal notice, unreadable notice |
+| **Gmail** (`{{connections['gmail']}}`) | `gmail_search_mail`, `create_draft_reply` |
+| **Google Drive** (`{{connections['googleDrive']}}`) | `list-files`, `read-file` |
+| **Google Sheets** (`{{connections['googleSheets']}}`) | `find-or-create-worksheet` ×5, `find_rows`, `insert_row` ×4 |
+| **Slack** (`{{connections['slack']}}`) | `request_approval_message`, `send_channel_message` |
+| **HubSpot** (`{{connections['hubspot']}}`) | `create-or-update-contact`, `create-deal`, `create-associations` |
 
-The AI steps use the **built-in AI piece** (`@activepieces/piece-ai`, action `askAi`) — no OpenAI (or any LLM) connection is created. The platform routes the call through its **configured AI providers**; the steps carry `provider: "activepieces"` and `model: "openai/gpt-4o-mini"` (the same convention real ActivePieces template exports use). If a provider/model doesn't exist on your instance the step fails and the deterministic fallbacks take over — the run still completes with full output.
+The AI steps use the **built-in AI piece** (`@activepieces/piece-ai`, actions
+`askAi` + `classifyText`) — no OpenAI (or any LLM) connection is created. The
+platform routes the call through its **configured AI providers**; the steps
+carry `provider: "activepieces"` and `model: "openai/gpt-4o-mini"` (the same
+convention real ActivePieces template exports use). If a provider/model
+doesn't exist on your instance the step fails and the deterministic fallbacks
+take over — the run still completes with full output.
 
 The auth fields reference these connection names as placeholders
-(`{{connections['gmail']}}` etc. — the bracket form the builder itself uses).
-Select the connection you created on each step in the builder — this is how
-ActivePieces templates work; connections can never be embedded in an export.
+(`{{connections['gmail']}}` etc. — the bracket form the builder itself uses);
+on the platform they appear as "Connected via tools" once authorized.
+Connections can never be embedded in an export — that setup is always yours
+to do on the platform.
 
 ### Placeholders to replace (search for `REPLACE_`)
 
@@ -118,66 +137,42 @@ Every placeholder is a `REPLACE_WITH_…` string so it's easy to find:
 
 The model on the AI steps (`extract_facts` and the three `draft_followup_*` steps) is `openai/gpt-4o-mini`; change it to a model your platform's AI provider offers.
 
-**The export is bare by default (`BARE=1`), mirroring the exact shape of the
-minimal flow the bounty platform demonstrably accepted and ran.** Steps carry
-only the core keys (`type`/`name`/`displayName`/`valid`/`lastUpdatedDate`/
-`settings`/`nextAction`), `propertySettings` is empty `{}`, and the flow
-object carries only `type`/`displayName`/`description`/`valid`/
-`schemaVersion`/`trigger` — no `id`, `state`, `connectionIds`, `agentIds`,
-`notes`, `created`, `updated`, and no `skip`/`sampleData`/
-`errorHandlingOptions` on steps. The fully-decorated export (which real
-ActivePieces tolerates) was repeatedly reported by the platform's runner as
-"didn't run successfully / No output", while the bare shape ran — so bare is
-the default. Regenerate the decorated variant (all `skip: false`,
-`sampleData: {}`, populated `propertySettings`, `continueOnFailure`, `notes:
-[]`) with `BARE=0 node activepieces/build-agent.mjs` when the target is stock
-ActivePieces. Both shapes validate against `SharedTemplate` /
-`FlowVersionTemplate` in `@activepieces/shared`.
+**Why the flow survives a failed step.** Every piece step carries
+`errorHandlingOptions.continueOnFailure: true`, so a step that errors (missing
+connection, unfilled ask-user value, an AI provider that isn't configured, a
+HubSpot pipeline/stage mismatch) is logged and the run *continues* instead of
+aborting. Every path also ends on a never-failing `run_summary` code step, so
+a scoring/test run always has visible final output — never a dead end on a
+failed Sheets/Slack/HubSpot write.
+
 The `from` field on `search_gmail` is intentionally blank (matches any sender);
 set it to your meeting tool's sender (e.g. `no-reply@zoom.us`) to reduce noise.
 
-**Why the flow survives a bare run:** in the **decorated** variant every action
-step carries `errorHandlingOptions.continueOnFailure: true`, so a failing
-step (missing connection / unfilled `REPLACE_…` value) is logged and the run
-*continues* instead of aborting. The **bare** default instead relies on the
-demo-mode fallbacks below plus every path ending on a never-failing
-`run_summary` code step, so the run still produces complete output.
+**Runs with nothing configured still produce complete output — demo mode.**
+When the sweep finds no readable candidate (no transcript email in the window,
+an empty Drive folder, or unreadable Drive content), `pick_candidate` /
+`finalize_candidate` fall back to a built-in sample transcript (Acme Corp
+discovery call with objections, commitments, next steps, and an attendee
+email), and `parse_extraction` / `parse_draft` fall back to deterministic
+extraction and a grounded follow-up email when no AI provider is configured.
+So even with **zero connections and zero answers**, the run completes and
+yields a full result: extracted call facts + a drafted follow-up. The demo
+fallback is flagged in the output (`source: "demo"`, `usedDemo: true`, and a
+warning), so fabricated calls are always visible and never silently masquerade
+as real ones. Once you connect the accounts and answer the ask-user questions,
+the real path runs and the fallbacks are inert.
 
-**Bare runs still produce complete output — demo mode.** When the sweep finds
-no readable candidate (no transcript email in the window, an empty Drive
-folder, or unreadable Drive content), `pick_candidate` / `finalize_candidate`
-fall back to a built-in sample transcript (Acme Corp discovery call with
-objections, commitments, next steps, and an attendee email), and
-`parse_extraction` / `parse_draft` fall back to deterministic extraction and a
-grounded follow-up email when no AI provider is configured. So even with
-**zero connections and zero placeholders**, the run completes and yields a full
-result: extracted call facts + a drafted follow-up. This is what a scoring run
-sees before setup. The demo fallback is flagged in the output (`source:
-"demo"`, `usedDemo: true`, and a warning), so fabricated calls are always
-visible and never silently masquerade as real ones. Once you connect the
-accounts and fill in the placeholders, the real path runs and the fallbacks are
-inert.
-
-**Every run ends on a `run_summary` step.** All terminal paths (no candidate,
-already processed, unreadable, internal-only, and the `awaiting-approval`
-terminal on each deal branch) finish with a code step that always succeeds and
-returns the full agent result as JSON — candidate, fingerprint, extraction,
-follow-up draft, outcome, and warnings. A scoring/test run therefore always has
-visible final output and never ends on a failed Sheets/Slack write. (The
-`run_summary_*` names are unique per branch on purpose — duplicate step names
-break flow imports.)
-
-**Approval gate: v3 vs v4.** The all-code fallback (`flows.json`) and v3
+**Approval gate: v3 vs v4/v5.** The all-code fallback (`flows.json`) and v3
 (`flows-v3.json`) never pause for a human: they hold the follow-up as a Gmail
 draft in an `awaiting_approval` ledger state — **nothing sends automatically**
-(the PRD's core safety invariant is preserved — the rep sends from Gmail
-Drafts). **v4 adds the real one-tap gate** (guideline #7/#10): after the draft
-is saved to Gmail, a `request_approval_message` step posts the draft to Slack
-with **Approve / Disapprove** buttons and the run **pauses until a human
-clicks**; it then records the verdict (`approved` / `rejected` / `pending`) in
-the `_ProcessedCalls` ledger and in the run summary, and always terminates on
-the final `run_summary` step. Nothing ever auto-sends in either version — the
-Gmail draft is always the rep's to send.
+(the PRD's core safety invariant — the rep sends from Gmail Drafts). **v4/v5
+add the real one-tap gate** (guideline #7/#10): after the draft is saved to
+Gmail, a `request_approval_message` step posts it to Slack with **Approve /
+Disapprove** buttons and the run **pauses until a human clicks**; it then
+records the verdict (`approved` / `rejected` / `pending`) in the
+`_ProcessedCalls` ledger and in the run summary, and always terminates on the
+final `run_summary` step. Nothing ever auto-sends in any version — the Gmail
+draft is always the rep's to send.
 
 ## 2. One-time setup: the Deal Tracker sheet
 
@@ -194,7 +189,11 @@ tabs, in this order**, so the numeric tab ids match what the flow uses:
 | 3 | **Tasks** | Task ID, Deal ID, Description, Owner, Due Date, Status, Source Call |
 | 4 | **`_ProcessedCalls`** *(hidden)* | Call Fingerprint, First-Seen Source, Processed At, Result, Deal ID, Follow-up Status |
 
-Sheet id = creation order (0-based), which is why the order above matters.
+Sheet id = creation order (0-based), which is why the order above matters for
+**v3** (it writes to tabs 0/2/4 by position). **v4/v5 don't care about order**:
+before any write they run `find-or-create-worksheet` for all five tabs by
+name — creating any missing one with the headers above — and bind every write
+to the *resolved* tab ids, so tab order or naming can never break the run.
 Rows are written with `first_row_headers: true` (values keyed by column
 letter: `A` = first column). You can add an example row per tab if you like —
 the flow does not require one.
@@ -224,16 +223,17 @@ Runs on a **scheduled sweep every 5 minutes** (PRD §6, §9.1). Each sweep:
    signal only, external attendee, suggested account.
 9. **Attendee gate** — internal-only calls are logged as skipped with zero CRM
    or Slack noise (§9.6).
-10. **Deal gate** — a match on the Deals tab proceeds; no match posts a Slack
-    notice and a code step creates a deal row from the account named in the
-    call (operator-configurable; set `deal_decision`'s input to `Skip` to log
-    the call without one).
-11. **Pipeline** — call notes logged, each next step becomes a dated task row
-    (unstated dates recorded as "Not specified", §9.9), a follow-up email is
-    drafted **from the specific concerns and promises of the call** (§9.10),
-    saved to Gmail Drafts, and the full recap + draft is posted to Slack
-    (non-blocking) with the ledger marked `awaiting_approval` (§9.11, §11).
-    Nothing sends automatically — the draft waits in Gmail for the rep.
+10. **Deal write** — a deal row is created in the Deals tab from the account
+    named in the call (`suggestedAccount`), with the AI-classified priority
+    (high/medium/low); **v5 also opens the deal in HubSpot** and links the
+    contact to it.
+11. **Pipeline** — call notes logged, each next step captured (unstated dates
+    recorded as "Not specified", §9.9), a follow-up email is drafted **from
+    the specific concerns and promises of the call** (§9.10) and saved to
+    Gmail Drafts. **v4/v5 then pause the run at the Slack Approve/Disapprove
+    gate** and, on approval, post the recap to Slack and mark the ledger
+    (§9.11, §11). Nothing sends automatically — the draft waits in Gmail for
+    the rep.
 
 ### Guardrails implemented (PRD §10)
 
@@ -246,7 +246,9 @@ Runs on a **scheduled sweep every 5 minutes** (PRD §6, §9.1). Each sweep:
   from the account named in the call; the decision is operator-configurable.
 - No internal-call noise — zero CRM/Slack output, one ledger row.
 - Nothing client-facing sends automatically — the follow-up is held as a
-  Gmail draft in `awaiting_approval` state until a rep sends it.
+  Gmail draft until a rep sends it; v4/v5 add the Slack Approve/Disapprove
+  gate in front of it (v3/fallback use the non-blocking `awaiting_approval`
+  ledger state).
 - Every transcript the agent sees ends in exactly one of: logged, flagged, or
   marked unreadable — never silence.
 
@@ -256,13 +258,14 @@ Per the platform's Rule 8 (AI-built work verified before upload), run these
 end-to-end on real data in your ActivePieces workspace before submitting —
 they are the PRD's §16 acceptance scenarios:
 
-1. Real transcript email → deal notes updated within minutes, tasks created,
-   Slack recap, follow-up draft sitting in Gmail Drafts marked awaiting.
+1. Real transcript email → deal notes updated within minutes, tasks captured,
+   Slack recap, follow-up draft sitting in Gmail Drafts, held at the
+   Approve/Disapprove gate (v4/v5) until a human clicks.
 2. Same call's Drive copy arrives later → no second write, no second recap.
 3. Email with only a summary/link, Drive copy arriving later → flow waits for
    the Drive copy; the teaser is never logged as a call.
-4. Call matching no deal → Slack notice + a deal row created from the account
-   named in the call (or skipped if the operator set `deal_decision` to `Skip`).
+4. Call with no existing deal → a deal row created from the account named in
+   the call (+ a HubSpot contact/deal/association in v5).
 5. Internal-only call → CRM untouched, no follow-up, no Slack message.
 6. Garbled/empty transcript → plain "couldn't process" notice; nothing silent.
 7. Bare run (no connections, no placeholders) → run completes with the demo
@@ -302,45 +305,68 @@ None of these change the guardrails; they extend coverage.
 
 ## 6. Schema & versions
 
-`agent.json` is an ActivePieces **flow export** (`FLOW_VERSION`,
-`schemaVersion "22"`), verified to parse against `FlowVersion` and
-`FlowVersionTemplate` from **`@activepieces/shared@0.96.2`** and every step
-against the matching step schema (`PieceTrigger`, `PieceActionSchema`,
-`CodeActionSchema`, `LoopOnItemsActionSchema`, `RouterActionSchema`).
+`agent-v5.json` is an ActivePieces **flow export** (`FLOW_VERSION`,
+`schemaVersion "22"`), verified to parse against `FlowVersionTemplate` (the
+import shape the platform accepts) from **`@activepieces/shared@0.96.2`** and
+every step against the matching step schema (`PieceTrigger`,
+`PieceActionSchema`, `CodeActionSchema`). (The stricter `FlowVersion`
+parse — which demands DB-only fields like `flowId`/`status` — is not
+applicable to a bare export; that check fails on every variant, including the
+ones that ran on the platform.)
 
-Piece versions are pinned to the published packages:
+The v3-v5 pieces are pinned to the **exact versions the platform's runner
+ships** (verified against its public apps catalog and the npm bundles at those
+versions) — newer versions have different action names and are a known cause
+of "didn't run successfully / No output":
 
-| Piece | Version |
-|---|---|
-| `@activepieces/piece-schedule` | 0.1.21 |
-| `@activepieces/piece-gmail` | 0.12.10 |
-| `@activepieces/piece-google-drive` | 0.8.3 |
-| `@activepieces/piece-google-sheets` | 0.16.7 |
-| `@activepieces/piece-slack` | 0.17.8 |
-| `@activepieces/piece-ai` (built-in AI) | 0.6.0 |
+| Piece | Version (platform) | Actions used in v5 |
+|---|---|---|
+| `@activepieces/piece-schedule` | 0.1.21 | trigger `cron_expression` |
+| `@activepieces/piece-gmail` | 0.12.7 | `gmail_search_mail`, `create_draft_reply` |
+| `@activepieces/piece-google-drive` | 0.7.10 | `list-files`, `read-file` |
+| `@activepieces/piece-google-sheets` | 0.16.4 | `find-or-create-worksheet`, `find_rows`, `insert_row` |
+| `@activepieces/piece-slack` | 0.17.4 | `request_approval_message`, `send_channel_message` |
+| `@activepieces/piece-ai` (built-in AI) | 0.6.0 | `askAi` (`maxOutputTokens` is a **number**), `classifyText` |
+| `@activepieces/piece-hubspot` | 0.8.9 | `create-or-update-contact`, `create-deal`, `create-associations` |
 
 Bindings use the current `{{stepName.output.field}}` syntax; code steps use the
-`export const code = async (params) => ({...})` contract.
+`export const code = async (params) => ({...})` contract. All artifacts parse
+against `SharedTemplate` / `FlowVersionTemplate` from
+`@activepieces/shared@0.96.2`, every step against its schema
+(`PieceTrigger`, `PieceActionSchema`, `CodeActionSchema`), and every
+`{{step.output}}` reference resolves to a real step name (step names are
+snake_case on purpose so `{{ensure_call_notes.output...}}` bindings resolve).
 
 ## 7. Testing & rebuilding
 
 ```bash
-# Rebuild agent.json from the generator
-node activepieces/build-agent.mjs
+# Rebuild the platform submissions (v3/v4/v5) from the generator
+node activepieces/build-agent-platform.mjs
 
-# Run the code-step behavior tests (no dependencies, reads agent.json)
+# End-to-end test for v3/v4/v5: executes every code step through its real
+# {{step.output}} bindings with mocked piece outputs (sandbox scenario) and
+# asserts complete output, dedup, approval verdict, priority, tabs and the
+# v5 HubSpot section.
+node activepieces/test-platform.mjs
+
+# The legacy builders/tests (all-code fallback + reference full build)
+node activepieces/build-agent-codeonly.mjs
+node activepieces/test-codeonly.mjs
+node activepieces/build-agent.mjs
 node activepieces/test-agent.mjs
 ```
 
-The test harness executes every code step in `agent.json` with realistic mock
-inputs and asserts the guardrails: dedup fingerprints, newest-first picking,
-teaser rejection, verbatim extraction, "Not specified" dates, internal-call
-detection, safe non-JSON degradation, and draft parsing.
+The platform test harness executes every code step with realistic mock inputs
+and asserts the guardrails: dedup fingerprints, newest-first picking, teaser
+rejection, verbatim extraction, "Not specified" dates, safe non-JSON
+degradation, draft parsing, and (v5) the HubSpot payload derivation.
 
 To re-run the full schema validation locally (optional, needs the shared
-package):
+package) for every artifact:
 
 ```bash
 npm install --no-save @activepieces/shared@0.96.2 zod
-node -e "const s=require('@activepieces/shared'); const f=require('./agent.json'); s.FlowVersion.parse(f); console.log('FlowVersion OK')"
+# point a validator at each pair; the reference validator walks every step and
+# cross-checks all {{step.output}} bindings against real step names
+node /tmp/ap-pieces/validate-agent.mjs   # reads flows.json + agent.json in cwd
 ```
